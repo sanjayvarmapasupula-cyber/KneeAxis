@@ -1,0 +1,74 @@
+{
+  "application": "KneeAxis — AI-Assisted 3D Knee Reconstruction & Arthroplasty Planning",
+  "version": "1.0.0",
+  "contracts": {
+    "kl_classifier": {
+      "model_name": "KneeAxis KL ResNet50 Classifier",
+      "architecture": "ResNet50 + GlobalAveragePooling2D + Dense(256) + Dropout(0.4) + Dense(5, softmax)",
+      "target_file_relative": "models/kl_classifier/best.weights.h5",
+      "config_file_relative": "models/kl_classifier/model_config.json",
+      "input_spec": {
+        "modalities": ["Bilateral Knee AP X-ray", "Unilateral High-Resolution Knee X-ray"],
+        "tensor_shape": [1, 224, 224, 3],
+        "dtype": "float32",
+        "value_range": "[0.0, 1.0]",
+        "channel_order": "RGB"
+      },
+      "output_spec": {
+        "tensor_shape": [1, 5],
+        "activation": "softmax",
+        "classes": {
+          "0": "KL 0 - Normal",
+          "1": "KL 1 - Doubtful",
+          "2": "KL 2 - Minimal (Definite Osteophyte)",
+          "3": "KL 3 - Moderate (Multiple Osteophytes & Joint Space Narrowing)",
+          "4": "KL 4 - Severe (Bone-on-Bone Joint Space Narrowing & Sclerosis)"
+        }
+      },
+      "cli_invocation": "python ml/inference/predict_kl.py --image <input_image_path> --weights models/kl_classifier/best.weights.h5 --config models/kl_classifier/model_config.json",
+      "stdout_contract": {
+        "format": "JSON",
+        "fields": {
+          "grade": "int (0-4)",
+          "label": "string",
+          "confidence": "float (0.0-1.0)",
+          "probabilities": {
+            "KL0": "float",
+            "KL1": "float",
+            "KL2": "float",
+            "KL3": "float",
+            "KL4": "float"
+          },
+          "mode": "string ('user_trained_weights')"
+        }
+      }
+    },
+    "knee_segmentation": {
+      "model_name": "KneeAxis 3D U-Net Knee Segmentation",
+      "architecture": "3D U-Net (3 resolution levels, 4x downsampling, Residual/Conv3D blocks, Softmax output)",
+      "target_file_relative": "models/knee_segmentation/best.weights.h5",
+      "config_file_relative": "models/knee_segmentation/model_config.json",
+      "dataset_source": "OAI Zuse Institute Berlin (OAIZIB-CM, Zenodo Record 14934086)",
+      "input_spec": {
+        "modalities": ["3D Knee MRI (Sagittal 3D DESS or similar)"],
+        "input_format": ".nii or .nii.gz",
+        "preprocessing": "Reorientation to standard axis, Z-score intensity normalization, patch extraction [64, 64, 64] or [96, 96, 96]"
+      },
+      "output_spec": {
+        "spatial_dimension": "3D Multi-label Volume (.nii.gz)",
+        "num_classes": 6,
+        "classes": {
+          "0": "Background",
+          "1": "Femur (Distal Bone)",
+          "2": "Femoral Cartilage",
+          "3": "Tibia (Proximal Bone)",
+          "4": "Medial Tibial Cartilage",
+          "5": "Lateral Tibial Cartilage"
+        },
+        "critical_boundary_note": "OAIZIB-CM dataset does NOT contain annotations for Patella or Fibula. Models trained on OAIZIB-CM output 6 anatomical classes only. For full-body/patella segmentations, see the external TotalSegmentator guidance in docs."
+      },
+      "cli_invocation": "python ml/inference/predict_segmentation.py --image <input_volume_path> --weights models/knee_segmentation/best.weights.h5 --output <output_nii_path>",
+      "exit_code_contract": "0 on success, non-zero on failure"
+    }
+  }
+}

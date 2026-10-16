@@ -1,0 +1,19 @@
+KneeAssist AI — ResNet-50 KL Grading Report
+==================================================
+Date: 2026-09-22 19:36
+Best Epoch: 15/15
+Test Accuracy: 54.2%
+
+               precision    recall  f1-score   support
+
+  KL-0 Normal      0.784     0.495     0.607       639
+KL-1 Doubtful      0.261     0.628     0.369       296
+    KL-2 Mild      0.718     0.421     0.530       447
+KL-3 Moderate      0.777     0.717     0.746       223
+  KL-4 Severe      0.644     0.922     0.758        51
+
+     accuracy                          0.542      1656
+    macro avg      0.637     0.637     0.602      1656
+ weighted avg      0.667     0.542     0.567      1656
+
+Training Time: 11.4 min | Device: cuda

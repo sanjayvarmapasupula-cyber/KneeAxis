@@ -1,0 +1,59 @@
+# KneeAxis College Training — Git Ignore
+# ========================================
+
+# Datasets (too large for version control)
+datasets/OAI/
+datasets/MOST/
+datasets/OAIZIB_CM/imagesTr/
+datasets/OAIZIB_CM/labelsTr/
+datasets/OAIZIB_CM/imagesTs/
+datasets/OAIZIB_CM/labelsTs/
+datasets/TotalSegmentator/
+
+# Model weights and checkpoints
+checkpoints/
+models/kl_classifier/best.weights.h5
+models/kl_classifier/best.keras
+models/knee_segmentation/best.weights.h5
+*.h5
+*.hdf5
+*.keras
+
+# Training outputs
+outputs/
+logs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Archives
+*.zip
+*.rar
+*.tar.gz
+
+# Environment
+.env
+.venv/
+env/
+venv/

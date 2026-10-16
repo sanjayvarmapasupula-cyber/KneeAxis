@@ -1,0 +1,16 @@
+{
+  "model": "ResNet-50",
+  "test_accuracy": 0.5417,
+  "best_val_accuracy": 0.5169,
+  "best_epoch": 15,
+  "mean_auc": 0.8703,
+  "per_class_auc": {
+    "KL-0": 0.8758,
+    "KL-1": 0.6838,
+    "KL-2": 0.8502,
+    "KL-3": 0.9482,
+    "KL-4": 0.9936
+  },
+  "training_time_min": 11.4,
+  "timestamp": "2026-09-22T19:36:49.713482"
+}

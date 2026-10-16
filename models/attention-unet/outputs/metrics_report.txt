@@ -1,0 +1,19 @@
+KneeAssist AI — Attention U-Net Segmentation Report
+============================================================
+Date: 2026-09-22 19:52:10
+Model: Attention U-Net (4 encoder + 4 decoder blocks)
+Parameters: 31,387,244
+Best Epoch: 14/15
+
+Validation Metrics:
+  Mean Dice Score:    0.9944
+  Mean IoU (Jaccard): 0.9889
+  Pixel Accuracy:     0.9976
+
+Per-Structure Metrics:
+       Femur:  Dice = 0.9937  |  IoU = 0.9875
+       Tibia:  Dice = 0.9938  |  IoU = 0.9877
+     Patella:  Dice = 0.9958  |  IoU = 0.9916
+
+Training Time: 3.6 minutes
+Device: cuda

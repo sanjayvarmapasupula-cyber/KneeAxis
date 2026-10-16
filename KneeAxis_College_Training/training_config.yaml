@@ -1,0 +1,69 @@
+# =============================================================================
+# KneeAxis — Master Offline College GPU Training Configuration
+# =============================================================================
+
+project: KneeAxis
+
+environment:
+  offline: true            # Strict offline mode: no downloads, no internet calls
+  require_gpu: true        # Preflight warns/errors if GPU not detected
+  memory_growth: true      # Enable dynamic TensorFlow GPU VRAM allocation
+
+training:
+  run_classification: true
+  run_segmentation: true
+  sequential_execution: true # Train classification first, clear session/process, then segmentation
+  resume_existing: true      # Resume from latest checkpoint if available
+  seed: 42
+  max_minutes: null          # Optional session time limit (e.g. 120 or null for unlimited)
+  continue_on_classification_failure: false # If classification fails, abort segmentation unless true
+
+paths:
+  datasets: datasets
+  manifests: manifests
+  checkpoints: checkpoints
+  models: models
+  outputs: outputs
+  logs: logs
+  wheelhouse: wheelhouse
+  pretrained: pretrained
+
+classification:
+  dataset: datasets/OAI
+  manifest: manifests/oai_manifest.csv
+  output: models/kl_classifier
+  image_size: [224, 224]
+  batch_size: 4
+  epochs_frozen: 5
+  epochs_unfrozen: 25
+  learning_rate: 0.0001
+  pretrained_weights: pretrained/resnet50_imagenet_notop.h5
+  initialization: local_pretrained # 'local_pretrained' (from file), 'random' (no weights)
+  allow_random_init_fallback: true # If pretrained file missing, fallback to random rather than crashing
+  early_stopping_patience: 8
+  test_size: 0.15
+  val_size: 0.15
+
+segmentation:
+  dataset: datasets/OAIZIB_CM
+  manifest: manifests/oaizib_manifest.csv
+  output: models/knee_segmentation
+  patch_size: [64, 64, 64]
+  batch_size: 1
+  base_filters: 16
+  epochs: 50
+  steps_per_epoch: 50
+  val_steps: 10
+  learning_rate: 0.0001
+  early_stopping_patience: 12
+  foreground_prob: 0.7
+  patches_per_volume: 16
+
+checkpointing:
+  save_best: true
+  save_latest: true
+  save_optimizer_state: true
+
+export:
+  enabled: true
+  output: KneeAxis_Trained_Artifacts.zip

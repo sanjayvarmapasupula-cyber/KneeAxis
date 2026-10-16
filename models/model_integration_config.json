@@ -1,0 +1,69 @@
+{
+  "_comment": "KNEEAXIS — User Model Training & Custom Integration Space. Toggle between fake values (while training) and your real trained weights once training is complete.",
+  "kl_classifier": {
+    "use_trained_model": false,
+    "weights_path": "models/kl_classifier/best.weights.h5",
+    "config_path": "models/kl_classifier/model_config.json",
+    "framework": "TensorFlow/Keras",
+    "input_shape": [
+      224,
+      224,
+      3
+    ],
+    "current_fake_values": {
+      "default_grade": 3,
+      "default_confidence": 0.945,
+      "default_label": "KL 3 - Moderate (Definite OA)",
+      "probabilities": {
+        "KL0": 0.01,
+        "KL1": 0.02,
+        "KL2": 0.05,
+        "KL3": 0.91,
+        "KL4": 0.01
+      }
+    }
+  },
+  "knee_segmentation": {
+    "use_trained_model": false,
+    "weights_path": "models/knee_segmentation/best.weights.h5",
+    "config_path": "models/knee_segmentation/model_config.json",
+    "framework": "PyTorch",
+    "input_shape": [
+      512,
+      512,
+      1
+    ],
+    "current_fake_values": {
+      "mean_dice": 0.965,
+      "femur_dice": 0.962,
+      "tibia_dice": 0.954,
+      "patella_dice": 0.938,
+      "femur_volume_cm3": 218.4,
+      "tibia_volume_cm3": 164.2,
+      "patella_volume_cm3": 24.8,
+      "status": "Watertight Surface Mask Ready"
+    }
+  },
+  "reconstruction_3d": {
+    "use_trained_model": false,
+    "algorithm": "Laplacian-Smoothed Marching Cubes",
+    "labels_path": "reconstruction3d/labels.json",
+    "current_fake_values": {
+      "watertight": true,
+      "vertices_count": 48200,
+      "faces_count": 96400,
+      "hausdorff_distance_mm": 0.42
+    }
+  },
+  "surgical_planning": {
+    "use_trained_model": false,
+    "algorithm": "Inverse Kinematic Alignment (iKA) Optimizer",
+    "current_fake_values": {
+      "resection_depth_femur_mm": 8.5,
+      "resection_depth_tibia_mm": 9,
+      "varus_valgus_angle_deg": 0,
+      "flexion_extension_angle_deg": 3,
+      "target_hka_deg": 180
+    }
+  }
+}

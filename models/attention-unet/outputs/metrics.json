@@ -1,0 +1,34 @@
+{
+  "model": "Attention U-Net",
+  "task": "Knee Bone Segmentation",
+  "num_classes": 4,
+  "class_names": [
+    "Background",
+    "Femur",
+    "Tibia",
+    "Patella"
+  ],
+  "total_parameters": 31387244,
+  "epochs": 15,
+  "best_epoch": 14,
+  "mean_dice": 0.9944,
+  "mean_iou": 0.9889,
+  "pixel_accuracy": 0.9976,
+  "per_class": {
+    "Femur": {
+      "dice": 0.9937,
+      "iou": 0.9875
+    },
+    "Tibia": {
+      "dice": 0.9938,
+      "iou": 0.9877
+    },
+    "Patella": {
+      "dice": 0.9958,
+      "iou": 0.9916
+    }
+  },
+  "training_time_min": 3.6,
+  "device": "cuda",
+  "timestamp": "2026-09-22T19:52:18.117214"
+}

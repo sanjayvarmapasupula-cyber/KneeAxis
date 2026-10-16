@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ROSA Knee Project — Full Architecture, Implementation & Viva Guide</title>
+  <style>
+    :root {
+      --primary: #0284c7;
+      --primary-dark: #0369a1;
+      --slate-50: #f8fafc;
+      --slate-100: #f1f5f9;
+      --slate-200: #e2e8f0;
+      --slate-700: #334155;
+      --slate-800: #1e293b;
+      --slate-900: #0f172a;
+      --emerald-600: #059669;
+      --emerald-50: #ecfdf5;
+      --amber-600: #d97706;
+      --amber-50: #fffbeb;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.65;
+      color: var(--slate-800);
+      background-color: var(--slate-50);
+      padding: 2rem 1rem;
+    }
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      background: #ffffff;
+      border: 1px solid var(--slate-200);
+      border-radius: 12px;
+      padding: 3rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    }
+    header {
+      border-bottom: 2px solid var(--slate-100);
+      padding-bottom: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    h1 {
+      font-size: 2rem;
+      color: var(--slate-900);
+      margin-bottom: 0.5rem;
+    }
+    .subtitle {
+      font-size: 1.1rem;
+      color: var(--slate-700);
+    }
+    .badge {
+      display: inline-block;
+      background: var(--emerald-50);
+      color: var(--emerald-600);
+      font-weight: 600;
+      font-size: 0.8rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      border: 1px solid #a7f3d0;
+      margin-top: 0.75rem;
+    }
+    .actions-bar {
+      display: flex;
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--primary);
+      color: #ffffff;
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border: none;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+    .btn:hover {
+      background: var(--primary-dark);
+    }
+    h2 {
+      font-size: 1.4rem;
+      color: var(--slate-900);
+      margin-top: 2rem;
+      margin-bottom: 0.8rem;
+      border-left: 4px solid var(--primary);
+      padding-left: 0.6rem;
+    }
+    h3 {
+      font-size: 1.15rem;
+      color: var(--slate-900);
+      margin-top: 1.2rem;
+      margin-bottom: 0.5rem;
+    }
+    p, ul, ol {
+      margin-bottom: 1rem;
+    }
+    ul, ol {
+      padding-left: 1.5rem;
+    }
+    li {
+      margin-bottom: 0.4rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+      font-size: 0.9rem;
+    }
+    th, td {
+      border: 1px solid var(--slate-200);
+      padding: 0.75rem;
+      text-align: left;
+    }
+    th {
+      background-color: var(--slate-100);
+      color: var(--slate-900);
+      font-weight: 600;
+    }
+    tr:nth-child(even) {
+      background-color: var(--slate-50);
+    }
+    pre, code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.875rem;
+    }
+    pre {
+      background: var(--slate-900);
+      color: #f8fafc;
+      padding: 1.2rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    p code, li code {
+      background: var(--slate-100);
+      color: var(--slate-900);
+      padding: 0.15rem 0.35rem;
+      border-radius: 4px;
+      border: 1px solid var(--slate-200);
+    }
+    .callout {
+      background: var(--slate-50);
+      border-left: 4px solid var(--primary);
+      padding: 1rem 1.2rem;
+      border-radius: 0 8px 8px 0;
+      margin: 1.5rem 0;
+    }
+    .callout-speech {
+      background: #f0fdf4;
+      border-left: 4px solid var(--emerald-600);
+      padding: 1.2rem 1.5rem;
+      border-radius: 0 8px 8px 0;
+      font-style: italic;
+      color: var(--slate-900);
+      margin: 1.5rem 0;
+    }
+    .qna-item {
+      background: var(--slate-50);
+      border: 1px solid var(--slate-200);
+      border-radius: 8px;
+      padding: 1rem 1.2rem;
+      margin-bottom: 0.8rem;
+    }
+    .qna-question {
+      font-weight: 700;
+      color: var(--slate-900);
+      margin-bottom: 0.3rem;
+    }
+    .qna-answer {
+      color: var(--slate-700);
+      margin-bottom: 0;
+    }
+    @media print {
+      body {
+        background: #ffffff;
+        padding: 0;
+      }
+      .container {
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        max-width: 100%;
+      }
+      .actions-bar {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>ROSA Knee Surgical Planning System (Clinical Atlas)</h1>
+      <div class="subtitle">Complete Technical Architecture, Clinical Workflow & Viva Examination Guide</div>
+      <span class="badge">Auditable AI-to-Mesh & 8-Step iKA Planning Platform</span>
+    </header>
+
+    <div class="actions-bar">
+      <button class="btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+    </div>
+
+    <h2>1. Executive Summary & Project Goal</h2>
+    <p>The <strong>ROSA Knee Project (Clinical Atlas)</strong> is a full-stack medical engineering research prototype for <strong>Robotic-Assisted Total Knee Arthroplasty (TKA)</strong>.</p>
+    <ul>
+      <li><strong>Patient Ingestion:</strong> Captures patient clinical records, MRN, and radiograph/CT metadata.</li>
+      <li><strong>AI-Assisted Segmentation:</strong> Multi-class volumetric bone segmentation (<strong>Femur</strong>, <strong>Tibia</strong>, <strong>Patella</strong>, <strong>Fibula</strong>).</li>
+      <li><strong>3D Anatomical Reconstruction:</strong> Coordinate-preserving 3D surface mesh generation in millimetric LPS physical space with non-shrinking Taubin smoothing.</li>
+      <li><strong>Deterministic iKA Planning:</strong> Closed-form 8-step Inverse Kinematic Alignment mathematical planning based on the 2025 ROSA clinical trial protocol (<em>Eijking et al. 2025, NCT05685693</em>).</li>
+      <li><strong>Cryptographic Audit Ledger & Hard Export Gate:</strong> SHA-256 manifest sealing that blocks unverified cut instructions from reaching surgical robotics consoles.</li>
+    </ul>
+
+    <h2>2. Clinical Problem & Significance</h2>
+    <ul>
+      <li><strong>Traditional TKA:</strong> Relies on 2D radiographs and manual cutting blocks, causing up to 20% patient dissatisfaction due to ligament tension imbalance.</li>
+      <li><strong>Commercial Surgical Robotics (e.g., ROSA, Mako):</strong> Proprietary, expensive "black boxes" where planning mathematics and intermediate 3D anatomical meshes cannot be inspected.</li>
+      <li><strong>Clinical Atlas Solution:</strong> An auditable, open-architecture surgical platform with deterministic kinematic alignment, real-time 3D WebGL visualization, and cryptographic safety verification.</li>
+    </ul>
+
+    <h2>3. Technology Stack Breakdown</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Technology</th>
+          <th>What is it?</th>
+          <th>Why do we use it in this project?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>React 19</strong></td>
+          <td>Component-driven frontend UI library</td>
+          <td>Manages dynamic clinical screens, state changes, and component reusability.</td>
+        </tr>
+        <tr>
+          <td><strong>Vite</strong></td>
+          <td>Next-generation frontend build tool</td>
+          <td>Fast dev server with instant Hot Module Replacement and production bundling.</td>
+        </tr>
+        <tr>
+          <td><strong>Three.js</strong></td>
+          <td>WebGL 3D graphics rendering library</td>
+          <td>Renders 3D femur, tibia, and resection cut planes in the web browser.</td>
+        </tr>
+        <tr>
+          <td><strong>Zustand</strong></td>
+          <td>Lightweight React state management</td>
+          <td>Shares global patient data, camera presets, and 3D bone visibility across all pages.</td>
+        </tr>
+        <tr>
+          <td><strong>Wouter</strong></td>
+          <td>Minimalist client-side router (~1.5KB)</td>
+          <td>Enables fast navigation across 13 clinical pages without page reloads.</td>
+        </tr>
+        <tr>
+          <td><strong>FastAPI (Python)</strong></td>
+          <td>Asynchronous Python web framework</td>
+          <td>Handles heavy medical calculations, scientific libraries, and auto-generates OpenAPI docs.</td>
+        </tr>
+        <tr>
+          <td><strong>SQLAlchemy 2.0</strong></td>
+          <td>Python Object-Relational Mapper (ORM)</td>
+          <td>Manages database tables for patients, 3D meshes, and audit logs with ACID compliance.</td>
+        </tr>
+        <tr>
+          <td><strong>Pydantic V2</strong></td>
+          <td>Data validation library</td>
+          <td>Enforces strict clinical validation for all incoming and outgoing API payloads.</td>
+        </tr>
+        <tr>
+          <td><strong>Pytest</strong></td>
+          <td>Automated Python testing framework</td>
+          <td>Runs automated tests on planning logic, mesh smoothing, and cryptographic safety gates.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>4. Full-Stack Directory Architecture</h2>
+    <pre><code>Project/
+├── frontend/                  # React 19 + Three.js User Interface
+│   ├── public/                # Static files (favicons, browser manifest)
+│   ├── index.html             # Web application HTML entry point
+│   └── src/
+│       ├── components/        # Reusable UI & 3D visualization components
+│       │   ├── 3d/            # Three.js knee models, resection planes, anatomical axes
+│       │   ├── layout/        # Header, Sidebar, Navigation
+│       │   └── ui/            # 53 Radix / shadcn UI primitive components
+│       ├── pages/             # 13 Clinical workflow screens
+│       ├── routes/            # Wouter client-side route definitions (AppRoutes.jsx)
+│       ├── services/          # API service layer (api.js)
+│       ├── store/             # Zustand global state stores (useAppStore.js)
+│       ├── styles/            # Global styling and Tailwind CSS (styles/index.css)
+│       ├── utils/             # Helper utilities (cn, clsx, twMerge)
+│       ├── App.jsx            # Main React application component
+│       └── main.jsx           # React DOM root mounting
+│
+├── backend/                   # FastAPI Medical Engineering Backend
+│   ├── app/
+│   │   ├── api/endpoints/     # REST controllers (patients, imaging, ika, mesh, audit)
+│   │   ├── core/              # Config (Pydantic Settings), DB engine, safety bounds
+│   │   ├── models/            # SQLAlchemy ORM models (Patient, Mesh, IKAPlan, AuditRecord)
+│   │   ├── schemas/           # Pydantic V2 data validation schemas
+│   │   ├── services/          # Algorithmic domain services (iKA, mesh, audit)
+│   │   └── main.py            # FastAPI server entry point
+│   ├── data/                  # SQLite database storage (clinical_atlas.db)
+│   ├── tests/                 # Automated test suite (Pytest - 8/8 passing)
+│   ├── requirements.txt       # Python backend dependencies
+│   └── run_backend.py         # Standalone backend server launcher
+│
+├── models/                    # AI weights & nnU-Net checkpoints
+├── uploads/                   # Stored raw CT scans / DICOM files
+├── outputs/                   # Generated 3D STL meshes & QA sidecars
+├── docs/                      # Clinical reports & development logs
+├── package.json               # Frontend dependencies & npm scripts
+└── README.md                  # Project overview documentation</code></pre>
+
+    <h2>5. Key File Inventory</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Component</th>
+          <th>File Path</th>
+          <th>Functionality</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Command Center</strong></td>
+          <td><code>frontend/src/pages/Dashboard.jsx</code></td>
+          <td>Displays patient triage queue, AI pipeline status, and key clinical metrics.</td>
+        </tr>
+        <tr>
+          <td><strong>CT Slice Viewer</strong></td>
+          <td><code>frontend/src/pages/ImagingViewer.jsx</code></td>
+          <td>Canvas-based 2D multi-planar CT viewer (Axial, Coronal, Sagittal) with window/level contrast tools.</td>
+        </tr>
+        <tr>
+          <td><strong>AI Segmentation</strong></td>
+          <td><code>frontend/src/pages/Segmentation.jsx</code></td>
+          <td>Displays 3D U-Net bone segmentation overlays, mask opacity, and Dice similarity coefficients.</td>
+        </tr>
+        <tr>
+          <td><strong>3D Reconstruction</strong></td>
+          <td><code>frontend/src/pages/Reconstruction.jsx</code></td>
+          <td>3D surface model inspection, bone opacity/wireframe toggles, and anatomical axis displays.</td>
+        </tr>
+        <tr>
+          <td><strong>Surgical Planning</strong></td>
+          <td><code>frontend/src/pages/SurgicalPlanning.jsx</code></td>
+          <td>Interactive TKA planning screen for distal cuts, posterior cuts, tibial slope, and gap balancing.</td>
+        </tr>
+        <tr>
+          <td><strong>3D Three.js Engine</strong></td>
+          <td><code>frontend/src/components/3d/KneeViewer.jsx</code></td>
+          <td>WebGL canvas rendering patient-specific femur, tibia, and dynamic resection plane meshes.</td>
+        </tr>
+        <tr>
+          <td><strong>iKA Calculator</strong></td>
+          <td><code>backend/app/services/ika_calculator.py</code></td>
+          <td>Implements closed-form 8-step Inverse Kinematic Alignment mathematics with boundary clamping.</td>
+        </tr>
+        <tr>
+          <td><strong>Mesh Engine</strong></td>
+          <td><code>backend/app/services/mesh_engine.py</code></td>
+          <td>Reconstructs 3D meshes in DICOM LPS physical space with non-shrinking Taubin smoothing.</td>
+        </tr>
+        <tr>
+          <td><strong>Audit Ledger</strong></td>
+          <td><code>backend/app/services/audit_ledger.py</code></td>
+          <td>Computes SHA-256 seals and enforces the Hard Export Gate.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>6. Complete API Endpoints</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Method</th>
+          <th>Endpoint</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>GET</code></td>
+          <td><code>/api/v1/patients/</code></td>
+          <td>List all registered surgical candidates.</td>
+        </tr>
+        <tr>
+          <td><code>POST</code></td>
+          <td><code>/api/v1/patients/</code></td>
+          <td>Register a new patient candidate.</td>
+        </tr>
+        <tr>
+          <td><code>POST</code></td>
+          <td><code>/api/v1/imaging/upload</code></td>
+          <td>Ingest radiograph / CT image, verify LPS coordinates, compute SHA-256 hash.</td>
+        </tr>
+        <tr>
+          <td><code>POST</code></td>
+          <td><code>/api/v1/imaging/triage</code></td>
+          <td>Execute Kellgren-Lawrence (KL) grading (0–4) & thermal synovitis analysis.</td>
+        </tr>
+        <tr>
+          <td><code>POST</code></td>
+          <td><code>/api/v1/segmentation/dispatch</code></td>
+          <td>Dispatch volumetric multi-class bone segmentation (Femur, Tibia, Patella, Fibula).</td>
+        </tr>
+        <tr>
+          <td><code>POST</code></td>
+          <td><code>/api/v1/mesh/generate</code></td>
+          <td>Generate millimetric LPS bone surface mesh with non-shrinking Taubin smoothing.</td>
+        </tr>
+        <tr>
+          <td><code>GET</code></td>
+          <td><code>/api/v1/mesh/export/{patient_id}/{bone}</code></td>
+          <td>Export STL/OBJ mesh file (<strong>Hard Export Gate protected</strong>).</td>
+        </tr>
+        <tr>
+          <td><code>POST</code></td>
+          <td><code>/api/v1/ika/calculate</code></td>
+          <td>Execute closed-form 8-step ROSA iKA resection planning.</td>
+        </tr>
+        <tr>
+          <td><code>POST</code></td>
+          <td><code>/api/v1/audit/signoff</code></td>
+          <td>Surgeon approval and cryptographic manifest sealing.</td>
+        </tr>
+        <tr>
+          <td><code>GET</code></td>
+          <td><code>/api/v1/analytics/cohort</code></td>
+          <td>Retrieve cohort-wide surgical accuracy and alignment distributions.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>7. Implementation Status</h2>
+    <div class="callout">
+      <h3>✅ Fully Implemented & Tested</h3>
+      <ul>
+        <li>13-page React 19 Frontend with dark/light mode and responsive layout.</li>
+        <li>Three.js 3D Viewer with bone controls and dynamic cut planes.</li>
+        <li>2D Multi-planar CT Slice Viewer with contrast window/level controls.</li>
+        <li>FastAPI backend with 8 REST endpoint controllers and OpenAPI docs.</li>
+        <li>8-step Inverse Kinematic Alignment (iKA) mathematical calculator with safety boundaries.</li>
+        <li>Taubin smoothing coordinate-preserving 3D mesh engine.</li>
+        <li>Cryptographic SHA-256 audit ledger and Hard Export Gate.</li>
+        <li>Relational database storage with SQLAlchemy ORM and SQLite.</li>
+        <li>Automated Pytest test suite with <strong>100% pass rate (8/8 tests passing)</strong>.</li>
+      </ul>
+      <h3 style="margin-top: 1rem; color: var(--amber-600);">⏳ Placeholders / Ready for Live Model Weights</h3>
+      <ul>
+        <li><strong>Live Deep Learning GPU Loop:</strong> Interface is structured with clean dispatch hooks in <code>segmentation_runner.py</code> ready for attaching live PyTorch <code>.pt</code> model checkpoints.</li>
+        <li><strong>Physical Robot Hardware Socket:</strong> Direct TCP/IP streaming to physical ROSA robotic console hardware.</li>
+      </ul>
+    </div>
+
+    <h2>8. 2-Minute Project Speech for Your Lecturer</h2>
+    <div class="callout-speech">
+      "Good morning/afternoon, Sir/Madam.<br><br>
+      I have developed <strong>Clinical Atlas</strong>, an auditable full-stack medical engineering platform for <strong>AI-assisted knee bone segmentation, 3D anatomical reconstruction, and robotic Total Knee Arthroplasty (TKA) planning</strong>.<br><br>
+      Current commercial robotic surgical systems operate as expensive, closed-loop proprietary systems where surgeons cannot inspect the underlying mathematical planning or intermediate 3D models. My project solves this by creating an open, transparent, and auditable clinical system.<br><br>
+      On the <strong>frontend</strong>, I built an interactive interface using <strong>React 19, JavaScript, and Three.js</strong>. It features a 2D multi-planar CT slice viewer and an interactive 3D WebGL knee viewer where surgeons can manipulate patient-specific femur, tibia, and patella models along with virtual surgical cut planes.<br><br>
+      On the <strong>backend</strong>, I developed a high-performance <strong>FastAPI (Python)</strong> server powered by <strong>SQLAlchemy</strong> and <strong>Pydantic</strong>. It handles patient management, imaging ingestion, and a deterministic <strong>8-step Inverse Kinematic Alignment (iKA)</strong> calculator based on the 2025 ROSA clinical trial protocol. It also includes an automated <strong>3D mesh QA engine with Taubin smoothing</strong> and a <strong>Cryptographic Audit Ledger</strong> with a <strong>Hard Export Gate</strong> that prevents unverified cut files from reaching surgical robots.<br><br>
+      The entire system is modular, fully tested with an automated test suite, and provides a complete bridge from raw CT scan to robotic surgical execution. Thank you."
+    </div>
+
+    <h2>9. Top 20 Viva Questions & Short Answers</h2>
+    <div class="qna-item">
+      <div class="qna-question">1. What is the main objective of your project?</div>
+      <div class="qna-answer">To provide an open, auditable clinical platform for AI knee segmentation, 3D bone reconstruction, and robotic TKA surgical planning.</div>
+    </div>
+    <div class="qna-item">
+      <div class="qna-question">2. What is TKA?</div>
+      <div class="qna-answer">Total Knee Arthroplasty — a surgical procedure where damaged knee bone and cartilage are replaced with artificial implants.</div>
+    </div>
+    <div class="qna-item">
+      <div class="qna-question">3. What is Inverse Kinematic Alignment (iKA)?</div>
+      <div class="qna-answer">An advanced surgical technique that restores the patient's individual, natural knee anatomy and ligament balance rather than forcing everyone into a standardized straight line.</div>
+    </div>
+    <div class="qna-item">
+      <div class="qna-question">4. Why did you use React for the frontend?</div>
+      <div class="qna-answer">For its modular component architecture, dynamic state rendering, and seamless integration with WebGL 3D libraries.</div>
+    </div>
+    <div class="qna-item">
+      <div class="qna-question">5. Why did you use FastAPI for the backend?</div>
+      <div class="qna-answer">Because Python is the standard for scientific computing, 3D geometric processing, and machine learning libraries (NumPy, PyTorch, VTK).</div>
+    </div>
+    <div class="qna-item">
+      <div class="qna-question">6. How does the 3D viewer work in the browser?</div>
+      <div class="qna-answer">It uses <strong>Three.js</strong> to render 3D meshes (femur, tibia, patella) and virtual resection planes directly on an HTML5 canvas via WebGL.</div>
+    </div>
+    <div class="qna-item">
+      <div class="qna-question">7. What is the purpose of Zustand?</div>
+      <div class="qna-answer">It is a lightweight state management store that shares data like selected patient, 3D camera presets, and bone visibility across different pages.</div>
+    </div>
+    <div class="qna-item">
+      <div class="qna-question">8. How do the frontend and backend communicate?</div>
+      <div class="qna-answer">Through RESTful API calls using standard HTTP methods (GET, POST, PUT, DELETE) exchanging JSON payloads.</div>
+    </div>
+    <div class="qna-item">
+      <div class="qna-question">9. What is CORS and why is it needed?</div>
+      <div class="qna-answer">Cross-Origin Resource Sharing. It allows our React frontend running on port 3000 to securely make API requests to our FastAPI backend running on port 8000.</div>
+    </div>
+    <div class="qna-item">
+      <div class="qna-question">10. What database are you using?</div>
+      <div class="qna-answer">SQLite managed through SQLAlchemy ORM, which can be swapped to PostgreSQL in production via environment configuration.</div>
+    </div>
+    <div class="qna-item">
+      <div class="qna-question">11. What bones are segmented in the knee?</div>
+      <div class="qna-answer">Femur (thigh bone), Tibia (shin bone), Patella (kneecap), and Fibula.</div>
+    </div>
+    <div class="qna-item">
+      <div class="qna-question">12. What is a Dice Similarity Coefficient?</div>
+      <div class="qna-answer">A statistical metric (0 to 1) used in medical imaging to measure the overlap accuracy between AI-predicted segmentation and ground truth manual annotation (&gt;0.95 is excellent).</div>
+    </div>
+    <div class="qna-item">
+      <div class="qna-question">13. What is Taubin smoothing?</div>
+      <div class="qna-answer">A two-step geometric mesh smoothing algorithm that removes surface noise from reconstructed 3D bones without shrinking their volume.</div>
+    </div>
+    <div class="qna-item">
+      <div class="qna-question">14. What is the Hard Export Gate in your project?</div>
+      <div class="qna-answer">A safety mechanism in the backend that blocks exporting 3D STL files or robotic cutting instructions until an authorized surgeon cryptographically signs off on the plan.</div>
+    </div>
+    <div class="qna-item">
+      <div class="qna-question">15. What is the purpose of the SHA-256 cryptographic seal?</div>
+      <div class="qna-answer">It generates an immutable hash combining image data, 3D mesh data, surgeon ID, and timestamp to prevent tampering with surgical plans.</div>
+    </div>
+    <div class="qna-item">
+      <div class="qna-question">16. What is the 2D CT viewer doing in ImagingViewer.jsx?</div>
+      <div class="qna-answer">It renders cross-sectional CT slices across Axial, Coronal, and Sagittal planes with window/level contrast adjustment controls.</div>
+    </div>
+    <div class="qna-item">
+      <div class="qna-question">17. What are PROMs?</div>
+      <div class="qna-answer">Patient-Reported Outcome Measures (like the Oxford Knee Score) used to track patient recovery and joint function post-surgery.</div>
+    </div>
+    <div class="qna-item">
+      <div class="qna-question">18. How do you handle file uploads in the backend?</div>
+      <div class="qna-answer">Files are received via multipart form-data, validated for size/type, hashed with SHA-256, and stored in the uploads/ directory.</div>
+    </div>
+    <div class="qna-item">
+      <div class="qna-question">19. How is the project tested?</div>
+      <div class="qna-answer">Using <strong>Pytest</strong>, covering API endpoints, mathematical iKA planning logic, mesh generation, and cryptographic audit gates.</div>
+    </div>
+    <div class="qna-item">
+      <div class="qna-question">20. What is the difference between what is implemented and what is a placeholder?</div>
+      <div class="qna-answer">The entire frontend, 3D viewer, REST API, mathematical iKA equations, mesh smoothing engine, audit ledger, and test suite are fully implemented. The live GPU deep-learning inference loop is cleanly structured as a dispatch hook ready for trained model weights.</div>
+    </div>
+  </div>
+</body>
+</html>

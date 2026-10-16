@@ -1,0 +1,16 @@
+{
+  "model_name": "Attention_UNet_3D_Knee_Segmentation",
+  "num_classes": 6,
+  "input_shape": [null, null, null, 1],
+  "class_mapping": {
+    "0": "background",
+    "1": "femur",
+    "2": "femoral_cartilage",
+    "3": "tibia",
+    "4": "medial_tibial_cartilage",
+    "5": "lateral_tibial_cartilage"
+  },
+  "architecture": "3D Attention U-Net",
+  "weights_file": "best.weights.h5",
+  "framework": "TensorFlow/Keras"
+}
