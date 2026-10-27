@@ -1,7 +1,7 @@
 import path from "path";
 import fs from "fs";
+import db from "../db/index.js";
 import { predictKLGrade } from "../services/predictionService.js";
-import { ImagingStudy } from "../models/ImagingStudy.js";
 import { sendSuccess, sendError } from "../utils/response.js";
 import { sanitizeId, getPatientUploadDir, getPatientSubdir } from "../utils/paths.js";
 
@@ -10,11 +10,14 @@ export const handleKLGradePrediction = async (req, res) => {
     const patientId = sanitizeId(req.params.patientId);
     let { imagePath, imagingStudyId } = req.body;
 
-    // If imagePath is not provided in body, locate latest uploaded X-ray for this patient
+    // If imagePath is not provided in body, locate latest uploaded X-ray for this patient from PostgreSQL
     if (!imagePath && imagingStudyId) {
       try {
-        const study = await ImagingStudy.findById(imagingStudyId);
-        if (study) imagePath = study.filePath;
+        const studyRes = await db.query(
+          "SELECT file_path FROM imaging_studies WHERE (id::text = $1 OR study_id = $1) AND patient_id = $2",
+          [imagingStudyId, patientId]
+        );
+        if (studyRes.rows.length > 0) imagePath = studyRes.rows[0].file_path;
       } catch {
         // continue search
       }
@@ -64,6 +67,14 @@ export const handleKLGradePrediction = async (req, res) => {
       "KL grade prediction computed successfully."
     );
   } catch (err) {
+    if (err.isModelNotTrained) {
+      return sendError(
+        res,
+        err.message,
+        { status: "not_trained", available: false },
+        503
+      );
+    }
     return sendError(res, "KL Grade Prediction failed.", err, err.statusCode || 500);
   }
 };

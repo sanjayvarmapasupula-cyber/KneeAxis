@@ -2,7 +2,6 @@ import path from "path";
 import fs from "fs";
 import db from "../db/index.js";
 import { recordApproval, isMeshApproved, getAuditRecordsForPatient } from "../services/auditService.js";
-import { AuditRecord } from "../models/AuditRecord.js";
 import { sendSuccess, sendError } from "../utils/response.js";
 import {
   sanitizeId,

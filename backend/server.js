@@ -1,17 +1,11 @@
-import dotenv from "dotenv";
-import path from "path";
-import { fileURLToPath } from "url";
-
-// Load environment variables from backend/.env
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.join(__dirname, ".env") });
-
+import "./config/env.js";
+import config from "./config/env.js";
 import app from "./app.js";
 import { initDatabase, getDbMode } from "./db/index.js";
 import { getUploadDir, getOutputDir } from "./utils/paths.js";
+import { jobService } from "./services/jobService.js";
 
-const PORT = process.env.PORT || 5000;
+const PORT = config.PORT;
 
 const startServer = async () => {
   // Ensure storage directories exist
@@ -20,6 +14,9 @@ const startServer = async () => {
 
   // Initialize PostgreSQL database layer & seed initial clinical data
   await initDatabase();
+
+  // Reconcile any interrupted or orphan jobs from prior runs
+  await jobService.reconcileOrphans();
 
   const server = app.listen(PORT, () => {
     console.log("=================================================");

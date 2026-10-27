@@ -1,7 +1,7 @@
 import path from "path";
 import fs from "fs";
+import db from "../db/index.js";
 import { startReconstructionJob } from "../services/reconstructionService.js";
-import { Mesh } from "../models/Mesh.js";
 import { sendSuccess, sendError } from "../utils/response.js";
 import { sanitizeId, getPatientUploadDir, getPatientOutputDir, getPatientSubdir } from "../utils/paths.js";
 
@@ -47,6 +47,29 @@ export const handleReconstructMeshes = async (req, res) => {
 
     if (isAsync) {
       return sendSuccess(res, result, "Reconstruction job accepted and running in background.", 202);
+    }
+
+    // Persist mesh metadata into PostgreSQL meshes table
+    if (result && Array.isArray(result.meshes)) {
+      for (const m of result.meshes) {
+        await db.query(
+          `INSERT INTO meshes (patient_id, anatomical_structure, file_path, volume_cm3, vertices_count, faces_count)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            patientId,
+            m.name || "Bone Structure",
+            m.stl || m.obj || "",
+            m.volume_mm3 ? m.volume_mm3 / 1000 : 200,
+            m.vertex_count || 48000,
+            m.face_count || 96000,
+          ]
+        ).catch(() => {});
+      }
+
+      await db.query(
+        "UPDATE patients SET reconstruction_status = 'Completed', updated_at = CURRENT_TIMESTAMP WHERE patient_id = $1",
+        [patientId]
+      ).catch(() => {});
     }
 
     return sendSuccess(res, result, "3D Mesh reconstruction completed successfully.");

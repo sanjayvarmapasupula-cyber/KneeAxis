@@ -128,3 +128,20 @@ ENV/
 client/public/__manus__/version.json
 .project-config.json
 
+# Patient Data & Private Clinical Uploads
+uploads/patients/*
+!uploads/patients/.gitkeep
+outputs/patients/*
+!outputs/patients/.gitkeep
+
+# Datasets (protect large imaging datasets from git)
+datasets/OAI/*
+!datasets/OAI/.gitkeep
+datasets/MOST/*
+!datasets/MOST/.gitkeep
+datasets/OAIZIB_CM/*
+!datasets/OAIZIB_CM/.gitkeep
+datasets/TotalSegmentator/*
+!datasets/TotalSegmentator/.gitkeep
+**/.env.backup
+**/.env.*.backup

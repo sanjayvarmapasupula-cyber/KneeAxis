@@ -3,7 +3,7 @@
  * Styled in clean medical white theme matching the frontend clinical workstation.
  * Rendered when visiting http://localhost:5000 in a web browser.
  */
-export function renderDashboardHtml() {
+export function renderDashboardHtml(csrfToken = "") {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -610,23 +610,21 @@ export function renderDashboardHtml() {
           Live API Endpoint Explorer
         </h2>
         <span style="font-size: 13px; color: var(--text-muted);">Click an endpoint to test live responses</span>
-      </div>
-
-      <div class="api-buttons">
+      </div>      <div class="api-buttons">
         <button class="api-btn active" onclick="callApi('/api/health', this)">
           <span class="method-tag method-get">GET</span> /api/health
         </button>
         <button class="api-btn" onclick="callApi('/api/patients', this)">
           <span class="method-tag method-get">GET</span> /api/patients
         </button>
-        <button class="api-btn" onclick="callApi('/api/patients/MRN-ROSA-0568', this)">
-          <span class="method-tag method-get">GET</span> /api/patients/MRN-ROSA-0568
+        <button class="api-btn" onclick="callApi('/api/dashboard/summary', this)">
+          <span class="method-tag method-get">GET</span> /api/dashboard/summary
         </button>
-        <button class="api-btn" onclick="callApi('/api/models/custom-config/get', this)">
-          <span class="method-tag method-get">GET</span> /api/models/custom-config/get
+        <button class="api-btn" onclick="callApi('/api/models', this)">
+          <span class="method-tag method-get">GET</span> /api/models
         </button>
-        <button class="api-btn" onclick="testKlInference(this)">
-          <span class="method-tag method-post">POST</span> /api/predict/kl (Eleanor Vance)
+        <button class="api-btn" onclick="toggleRegisterForm(this)" style="background: #e0f2fe; border-color: #0284c7; color: #0369a1;">
+          <span class="method-tag method-post">POST</span> /api/patients (Register)
         </button>
         <button class="api-btn" onclick="callApi('/api/jobs', this)">
           <span class="method-tag method-get">GET</span> /api/jobs
@@ -647,14 +645,75 @@ export function renderDashboardHtml() {
       </div>
     </div>
 
-    <!-- Seeded Patients Preview -->
+    <!-- Active Clinical Cohort in PostgreSQL & Quick Registration -->
     <div class="console-section">
       <div class="section-header">
         <h2>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
           Active Clinical Cohort in PostgreSQL
         </h2>
+        <div style="display: flex; gap: 8px;">
+          <button class="api-btn" onclick="loadPatients()" style="padding: 6px 14px; font-size: 12px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            Refresh Cohort
+          </button>
+          <button class="api-btn" onclick="toggleRegisterForm()" style="background: #0284c7; color: white; border-color: #0284c7; padding: 6px 14px; font-size: 12px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Enroll New Patient
+          </button>
+        </div>
       </div>
+
+      <!-- Quick Patient Registration Panel -->
+      <div id="registerFormContainer" style="display: none; background: #f8fafc; border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h4 style="font-size: 14px; font-weight: 700; color: #0f172a;">Enroll Clinical Patient Record</h4>
+          <span style="font-size: 11px; color: var(--text-muted);">Saves directly to PostgreSQL database</span>
+        </div>
+        <form onsubmit="handleConsoleRegister(event)" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+          <div>
+            <label style="display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px;">Patient MRN / ID *</label>
+            <input id="newPatientId" required type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; font-family: monospace;" />
+          </div>
+          <div>
+            <label style="display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px;">Full Name *</label>
+            <input id="newPatientName" required type="text" placeholder="e.g. Johnathan Miller" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" />
+          </div>
+          <div>
+            <label style="display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px;">Date of Birth</label>
+            <input id="newPatientDob" type="date" value="1965-06-15" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" />
+          </div>
+          <div>
+            <label style="display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px;">Gender</label>
+            <select id="newPatientGender" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
+              <option value="Female">Female</option>
+              <option value="Male">Male</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label style="display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px;">Affected Knee</label>
+            <select id="newPatientKnee" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
+              <option value="Right">Right Knee</option>
+              <option value="Left">Left Knee</option>
+              <option value="Bilateral">Bilateral</option>
+            </select>
+          </div>
+          <div>
+            <label style="display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px;">Urgency Priority</label>
+            <select id="newPatientUrgency" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
+              <option value="Routine">Routine</option>
+              <option value="High">High</option>
+              <option value="Emergency">Emergency</option>
+            </select>
+          </div>
+          <div style="grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px;">
+            <button type="button" onclick="toggleRegisterForm()" style="padding: 8px 16px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; background: white; cursor: pointer;">Cancel</button>
+            <button id="submitRegisterBtn" type="submit" style="padding: 8px 20px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; background: #0284c7; color: white; cursor: pointer;">Register Patient (POST /api/patients)</button>
+          </div>
+        </form>
+      </div>
+
       <div style="overflow-x: auto;">
         <table class="patient-table">
           <thead>
@@ -668,7 +727,7 @@ export function renderDashboardHtml() {
             </tr>
           </thead>
           <tbody id="patientTableBody">
-            <tr><td colspan="6" style="text-align: center; color: var(--text-dim);">Loading patient cohort...</td></tr>
+            <tr><td colspan="6" style="text-align: center; color: var(--text-dim); padding: 18px;">Loading clinical patient cohort...</td></tr>
           </tbody>
         </table>
       </div>
@@ -683,6 +742,65 @@ export function renderDashboardHtml() {
   </div>
 
   <script>
+    function toggleRegisterForm() {
+      const container = document.getElementById('registerFormContainer');
+      const isHidden = container.style.display === 'none';
+      container.style.display = isHidden ? 'block' : 'none';
+      if (isHidden) {
+        document.getElementById('newPatientId').value = 'KA-' + Math.floor(1000 + Math.random() * 9000);
+      }
+    }
+
+    async function handleConsoleRegister(e) {
+      e.preventDefault();
+      const patientId = document.getElementById('newPatientId').value;
+      const name = document.getElementById('newPatientName').value;
+      const dateOfBirth = document.getElementById('newPatientDob').value;
+      const gender = document.getElementById('newPatientGender').value;
+      const affectedKnee = document.getElementById('newPatientKnee').value;
+      const urgency = document.getElementById('newPatientUrgency').value;
+
+      const payload = {
+        patientId,
+        name,
+        dateOfBirth,
+        gender,
+        affectedKnee,
+        urgency,
+        clinicalNotes: 'Enrolled via KneeAxis Web Console'
+      };
+
+      const label = document.getElementById('endpointLabel');
+      const output = document.getElementById('consoleOutput');
+      const status = document.getElementById('responseStatus');
+
+      label.innerText = 'POST http://localhost:5000/api/patients';
+      output.innerText = 'Enrolling patient ' + patientId + ' in PostgreSQL...';
+
+      try {
+        const start = performance.now();
+        const res = await fetch('/api/patients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const elapsed = (performance.now() - start).toFixed(0);
+        status.innerText = res.status + ' ' + res.statusText + ' (' + elapsed + 'ms)';
+        status.style.color = res.ok ? '#34d399' : '#ef4444';
+        const json = await res.json();
+        output.innerText = JSON.stringify(json, null, 2);
+        if (res.ok) {
+          toggleRegisterForm();
+          document.getElementById('newPatientName').value = '';
+          await loadPatients();
+        }
+      } catch (err) {
+        status.innerText = 'ERROR';
+        status.style.color = '#ef4444';
+        output.innerText = 'Registration error: ' + err.message;
+      }
+    }
+
     async function callApi(endpoint, btn) {
       if (btn) {
         document.querySelectorAll('.api-btn').forEach(b => b.classList.remove('active'));
@@ -703,6 +821,10 @@ export function renderDashboardHtml() {
         status.style.color = res.ok ? '#34d399' : '#ef4444';
         const json = await res.json();
         output.innerText = JSON.stringify(json, null, 2);
+
+        if (endpoint === '/api/patients') {
+          loadPatients();
+        }
       } catch (err) {
         status.innerText = 'ERROR';
         status.style.color = '#ef4444';
@@ -743,23 +865,34 @@ export function renderDashboardHtml() {
       try {
         const res = await fetch('/api/patients');
         const json = await res.json();
+        const countEl = document.getElementById('patientCount');
+        const tbody = document.getElementById('patientTableBody');
         if (json.data && Array.isArray(json.data)) {
-          document.getElementById('patientCount').innerText = json.data.length + ' Records';
-          const tbody = document.getElementById('patientTableBody');
+          if (countEl) countEl.innerText = json.data.length + ' Record' + (json.data.length === 1 ? '' : 's');
+          if (json.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-dim); padding: 24px;">No registered clinical patients in PostgreSQL. Click "Enroll New Patient" above to register one.</td></tr>';
+            return;
+          }
           tbody.innerHTML = json.data.map(function(p) {
-            var kneeClass = p.affectedKnee === 'Right' ? 'badge-blue' : 'badge-purple';
+            const pId = p.patientId || p.id;
+            const knee = p.affectedKnee || p.kneeSide || 'Right';
+            const kneeClass = knee === 'Right' ? 'badge-blue' : 'badge-purple';
             return '<tr>' +
-              '<td><strong style="color: #0284c7; font-family: JetBrains Mono, monospace;">' + p.patientId + '</strong></td>' +
-              '<td>' + p.name + '</td>' +
+              '<td><strong style="color: #0284c7; font-family: JetBrains Mono, monospace;">' + pId + '</strong></td>' +
+              '<td>' + (p.name || 'Unknown') + '</td>' +
               '<td>' + (p.age || 'N/A') + ' yo / ' + (p.gender || 'Unknown') + '</td>' +
-              '<td><span class="badge-pill ' + kneeClass + '">' + (p.affectedKnee || 'Right') + '</span></td>' +
-              '<td style="color: #64748b; font-size: 12px; max-width: 320px;">' + (p.clinicalNotes || 'None') + '</td>' +
-              '<td><button class="api-btn" style="padding: 4px 10px; font-size: 11px;" onclick="callApi(\\'/api/patients/' + p.patientId + '\\', null)">Inspect</button></td>' +
+              '<td><span class="badge-pill ' + kneeClass + '">' + knee + '</span></td>' +
+              '<td style="color: #64748b; font-size: 12px; max-width: 320px;">' + (p.clinicalNotes || p.notes || 'Routine Assessment') + '</td>' +
+              '<td><button class="api-btn" style="padding: 4px 10px; font-size: 11px;" onclick="callApi(\'/api/patients/' + pId + '\', null)">Inspect</button></td>' +
               '</tr>';
           }).join('');
+        } else {
+          if (countEl) countEl.innerText = '0 Records';
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #ef4444; padding: 20px;">Failed to load cohort: ' + (json.message || 'Unknown response') + '</td></tr>';
         }
       } catch (e) {
         console.error('Failed to load patient cohort:', e);
+        document.getElementById('patientTableBody').innerHTML = '<tr><td colspan="6" style="text-align: center; color: #ef4444; padding: 20px;">Error connecting to patient API: ' + e.message + '</td></tr>';
       }
     }
 

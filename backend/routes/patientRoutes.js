@@ -6,13 +6,17 @@ import {
   updatePatient,
   deletePatient,
 } from "../controllers/patientController.js";
+import { requireAuth } from "../middleware/auth.js";
+import { requirePatientAccess } from "../middleware/patientAuth.js";
 
 const router = express.Router();
 
+router.use(requireAuth);
+
 router.post("/", createPatient);
 router.get("/", getAllPatients);
-router.get("/:id", getPatientById);
-router.put("/:id", updatePatient);
-router.delete("/:id", deletePatient);
+router.get("/:id", requirePatientAccess, getPatientById);
+router.put("/:id", requirePatientAccess, updatePatient);
+router.delete("/:id", requirePatientAccess, deletePatient);
 
 export default router;
