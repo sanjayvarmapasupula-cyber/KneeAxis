@@ -33,69 +33,71 @@
 /* ===== KneeAxis Classic Clinical Minimal — Design Tokens ===== */
 :root {
   /* Brand palette */
-  --ka-ink: #1B2C3F;
-  --ka-ink-strong: #17283B;
-  --ka-muted: #68788B;
+  --ka-ink: #0B1E2E;
+  --ka-ink-strong: #0B1E2E;
+  --ka-muted: #64748B;
   --ka-muted-2: #8390a0;
-  --ka-brand: #256C83;
-  --ka-brand-deep: #1D566B;
+  --ka-brand: #0082A6;
+  --ka-brand-accent: #00A5B5;
+  --ka-brand-deep: #005C9A;
+  --ka-brand-gradient: linear-gradient(135deg, #00A5B5 0%, #0082A6 60%, #005C9A 100%);
   --ka-brand-wash: #EAF4F6;
   --ka-bg: #F7F9FB;
   --ka-surface: #FFFFFF;
-  --ka-surface-alt: #F2F6F8;
-  --ka-line: #E4EAF0;
-  --ka-soft-shadow: 0 10px 32px rgba(23,40,59,.045);
-  --ka-radius: 13px;
-  --ka-radius-lg: 18px;
-  --ka-font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+  --ka-surface-alt: #F1F5F9;
+  --ka-line: #E2E8F0;
+  --ka-soft-shadow: 0 10px 32px rgba(20,40,54,.045);
+  --ka-radius: 12px;
+  --ka-radius-lg: 16px;
+  --ka-font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --ka-font-brand: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --ka-serif: Georgia, "Times New Roman", serif;
-  --ka-footer-bg: #182c3d;
+  --ka-footer-bg: #0B1E2E;
 
   /* Tailwind/shadcn token mapping */
-  --primary: #256C83;
+  --primary: #0082A6;
   --primary-foreground: #ffffff;
   --background: #F7F9FB;
-  --foreground: #1B2C3F;
+  --foreground: #0B1E2E;
   --card: #ffffff;
-  --card-foreground: #1B2C3F;
+  --card-foreground: #0B1E2E;
   --popover: #ffffff;
-  --popover-foreground: #1B2C3F;
-  --secondary: #F2F6F8;
-  --secondary-foreground: #1D566B;
-  --muted: #F2F6F8;
-  --muted-foreground: #68788B;
+  --popover-foreground: #0B1E2E;
+  --secondary: #F1F5F9;
+  --secondary-foreground: #005C9A;
+  --muted: #F1F5F9;
+  --muted-foreground: #64748B;
   --accent: #EAF4F6;
-  --accent-foreground: #1D566B;
-  --destructive: #D94845;
+  --accent-foreground: #0082A6;
+  --destructive: #DC2626;
   --destructive-foreground: #fff7f6;
-  --border: #E4EAF0;
-  --input: #E4EAF0;
-  --ring: #256C83;
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #0082A6;
 
   /* Legacy compat */
   --navy: #F7F9FB;
   --navy-2: #ffffff;
-  --ink: #1B2C3F;
-  --slate: #68788B;
+  --ink: #0B1E2E;
+  --slate: #64748B;
   --paper: #ffffff;
   --paper-2: #F7F9FB;
-  --cyan: #256C83;
-  --lime: #16a34a;
-  --orange: #ea580c;
+  --cyan: #0082A6;
+  --lime: #15803D;
+  --orange: #D97706;
   --purple: #9333ea;
   --pink: #db2777;
-  --blue: #256C83;
+  --blue: #0082A6;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 
   /* Status colors */
-  --ka-success: #2E7D58;
+  --ka-success: #15803D;
   --ka-success-bg: #E8F5EE;
-  --ka-warning: #946d23;
+  --ka-warning: #B45309;
   --ka-warning-bg: #FFF9ED;
-  --ka-error: #C0392B;
+  --ka-error: #DC2626;
   --ka-error-bg: #FDEDEB;
-  --ka-info: #236278;
+  --ka-info: #0082A6;
   --ka-info-bg: #EEF7F9;
 }
 
@@ -105,14 +107,14 @@ body {
   margin: 0;
   background: var(--ka-bg);
   color: var(--ka-ink);
-  font: 15px/1.58 var(--ka-font);
+  font: 14px/1.55 var(--ka-font);
   -webkit-font-smoothing: antialiased;
 }
 a { color: inherit; text-decoration: none; }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; border: 0; }
 button:disabled { cursor: not-allowed; opacity: .6; }
-:focus-visible { outline: 3px solid rgba(37,108,131,.45); outline-offset: 3px; }
+:focus-visible { outline: 3px solid rgba(0,130,166,.35); outline-offset: 3px; }
 ::selection { background: #d8edf0; color: #173b4a; }
 
 @layer base {
@@ -120,8 +122,75 @@ button:disabled { cursor: not-allowed; opacity: .6; }
   button:not(:disabled), [role="button"]:not([aria-disabled="true"]), a[href], input[type="checkbox"]:not(:disabled) { @apply cursor-pointer; }
 }
 
-/* KneeAxis Component Utilities */
-.ka-panel { background: #fff; border: 1px solid var(--ka-line); border-radius: 13px; padding: 24px; margin-bottom: 20px; box-shadow: var(--ka-soft-shadow); }
+/* KneeAxis Unified Component Utilities */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #00A5B5 0%, #0082A6 60%, #005C9A 100%);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 13px;
+  border-radius: 10px;
+  min-height: 40px;
+  padding: 9px 18px;
+  box-shadow: 0 2px 6px rgba(0, 130, 166, 0.2);
+  transition: all 0.18s ease;
+  cursor: pointer;
+  border: none;
+}
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.95;
+  box-shadow: 0 4px 14px rgba(0, 130, 166, 0.32);
+  transform: translateY(-1px);
+}
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #f1f5f9;
+  color: #1e293b;
+  font-weight: 600;
+  font-size: 13px;
+  border-radius: 10px;
+  min-height: 40px;
+  padding: 9px 16px;
+  border: 1px solid #e2e8f0;
+  transition: all 0.18s ease;
+  cursor: pointer;
+}
+.btn-secondary:hover:not(:disabled) {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #ffffff;
+  color: #0b1e2e;
+  font-weight: 600;
+  font-size: 13px;
+  border-radius: 10px;
+  min-height: 40px;
+  padding: 9px 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  transition: all 0.18s ease;
+  cursor: pointer;
+}
+.btn-outline:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.ka-panel { background: #fff; border: 1px solid var(--ka-line); border-radius: 14px; padding: 24px; margin-bottom: 20px; box-shadow: var(--ka-soft-shadow); }
 .ka-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 20px; }
 .ka-status-bar { border: 1px solid #e1e8ee; border-radius: 11px; padding: 13px 16px; background: #f8fafb; font-size: 12px; color: #647787; }
 .ka-status-bar strong { color: var(--ka-ink); }

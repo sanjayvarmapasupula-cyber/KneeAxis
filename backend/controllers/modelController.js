@@ -1,14 +1,40 @@
 import fs from "fs";
 import path from "path";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "url";
 import { spawn } from "child_process";
 import db from "../db/index.js";
 import { sendSuccess, sendError } from "../utils/response.js";
 import { getPythonPath } from "../utils/paths.js";
+import { modelStatus } from "../services/livePipelineService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "../../");
+
+/**
+ * Return deployment readiness status for AI models
+ * Prior to genuine training, explicitly declares Not Trained
+ */
+export const getModelStatus = async (req, res) => {
+  const nn = modelStatus();
+  return res.status(200).json({
+    success: true,
+    data: {
+      classification: { status: 'not_trained', available: false },
+      segmentation: {
+        status: nn.ready ? 'ready' : 'not_trained',
+        available: nn.ready,
+        architecture: 'nnU-Net v2 / 3D PlainConvUNet',
+        trainedEpochs: nn.trainedEpochs,
+        checkpoint: nn.checkpoint,
+        validation: nn.validation,
+        intendedUse: 'Research only — not clinically validated',
+      },
+    },
+    message: 'Model readiness is based on the verified local nnU-Net checkpoint path.',
+  });
+};
 
 /**
  * List all registered ML and algorithmic models with real-time disk status
@@ -118,181 +144,81 @@ export const getModelById = async (req, res) => {
  * Test run model inference interactively
  */
 export const testModelInference = async (req, res) => {
-  try {
-    const { modelId } = req.params;
-    const { sampleCase, parameters } = req.body;
-
-    const startTime = Date.now();
-
-    // Determine simulation or live python execution based on model type
-    let inferenceResult = null;
-
-    if (modelId.includes("KL") || modelId === "MOD-KL-RESNET50") {
-      // Execute Python KL inference script if available
-      const klScript = path.resolve(projectRoot, "ml/inference/predict_kl.py");
-      const sampleImg = path.resolve(projectRoot, "tests/fixtures/sample_knee.png");
-
-      if (fs.existsSync(klScript)) {
-        // Execute python script
-        const pythonCmd = getPythonPath();
-        const pArgs = [klScript, "--image", fs.existsSync(sampleImg) ? sampleImg : klScript];
-        
-        try {
-          const pyOutput = await new Promise((resolve) => {
-            const proc = spawn(pythonCmd, pArgs, { cwd: path.dirname(klScript) });
-            let stdout = "";
-            proc.stdout.on("data", (d) => { stdout += d; });
-            proc.on("close", (code) => {
-              try {
-                resolve(JSON.parse(stdout));
-              } catch {
-                resolve(null);
-              }
-            });
-            proc.on("error", () => resolve(null));
-          });
-
-          if (pyOutput) {
-            inferenceResult = pyOutput;
-          }
-        } catch {}
-      }
-
-      // If python fallback needed
-      if (!inferenceResult) {
-        const isSevere = sampleCase === "marcus";
-        const isMild = sampleCase === "clara";
-        const grade = isSevere ? 4 : isMild ? 1 : 3;
-        const confidence = isSevere ? 0.945 : isMild ? 0.887 : 0.912;
-
-        inferenceResult = {
-          grade,
-          label: `KL ${grade} - ${grade === 4 ? "Severe" : grade === 3 ? "Moderate" : "Mild"} Osteoarthritis`,
-          confidence,
-          probabilities: {
-            KL0: isMild ? 0.08 : 0.01,
-            KL1: isMild ? 0.82 : 0.02,
-            KL2: 0.06,
-            KL3: isSevere ? 0.12 : isMild ? 0.03 : 0.91,
-            KL4: isSevere ? 0.80 : 0.01,
-          },
-          executionMode: "Calibrated Neural Inference Pipeline",
-        };
-      }
-    } else if (modelId.includes("SEG") || modelId === "MOD-SEG-ATTN-UNET") {
-      inferenceResult = {
-        model: "3D Attention U-Net",
-        diceScores: {
-          femur: 0.962,
-          tibia: 0.954,
-          patella: 0.938,
-          meanDice: 0.951,
-        },
-        segmentationVolumes: {
-          femurVolumeCm3: 218.4,
-          tibiaVolumeCm3: 164.2,
-          patellaVolumeCm3: 24.8,
-        },
-        sliceCountProcessed: 420,
-        voxelResolutionMm: [0.625, 0.625, 0.5],
-        status: "Segmentation Complete",
-      };
-    } else if (modelId.includes("REC") || modelId === "MOD-REC-MARCHING-CUBES") {
-      inferenceResult = {
-        model: "Laplacian-Smoothed Marching Cubes",
-        meshesGenerated: ["femur.obj", "tibia.obj", "patella.obj"],
-        verticesCount: 48200,
-        facesCount: 96400,
-        watertight: true,
-        hausdorffDistanceMm: 0.42,
-        status: "Watertight Surface Reconstructed",
-      };
-    } else {
-      inferenceResult = {
-        model: modelId,
-        status: "Executed Successfully",
-        resectionFemurMm: 8.5,
-        resectionTibiaMm: 9.0,
-        jointLineDeviationMm: 0.2,
-        alignmentRestoration: "Inverse Kinematic Alignment Achieved",
-      };
-    }
-
-    const elapsed = Date.now() - startTime;
-    inferenceResult.elapsedMs = Math.max(elapsed, 45);
-
-    // Record in audit log
-    try {
-      await db.query(
-        `INSERT INTO audit_records (patient_id, action, user_email, user_name, role, notes)
-         VALUES ($1, 'MODEL_INFERENCE_TEST', $2, $3, $4, $5)`,
-        [
-          sampleCase || "TEST-CASE",
-          req.user ? req.user.email : "system@clinicalatlas.demo",
-          req.user ? req.user.full_name : "Clinical Tester",
-          req.user ? req.user.role : "technician",
-          `Executed inference test on model ${modelId}. Result: ${JSON.stringify(inferenceResult.label || inferenceResult.status)}`
-        ]
-      );
-    } catch {}
-
-    return sendSuccess(res, inferenceResult, `Inference test for ${modelId} completed.`);
-  } catch (err) {
-    return sendError(res, "Model inference execution failed.", err, 500);
-  }
+  return sendError(res,
+    "Synthetic model-test results are disabled. Use the authenticated live MRI inference workflow.",
+    null, 501);
 };
 
 /**
  * Upload new trained model weights (.h5, .onnx, .pth)
  */
 export const uploadWeights = async (req, res) => {
+  const { modelId } = req.params;
+  let finalPath = null;
+  let registered = false;
   try {
-    const { modelId } = req.params;
+    if (!req.file) return sendError(res, "No weight file uploaded.", null, 400);
 
-    if (!req.file) {
-      return sendError(res, "No weight file uploaded.", null, 400);
+    if (!/^[a-zA-Z0-9_-]{1,100}$/.test(modelId)) {
+      return sendError(res, "Invalid model identifier.", null, 400);
     }
 
-    const destDir = path.resolve(projectRoot, `models/${modelId.toLowerCase().replace(/[^a-z0-9_-]/g, "")}`);
-    if (!fs.existsSync(destDir)) {
-      fs.mkdirSync(destDir, { recursive: true });
+    const extension = path.extname(req.file.originalname).toLowerCase();
+    const permitted = new Set([".h5", ".keras", ".onnx", ".pth", ".pt", ".safetensors"]);
+    if (!permitted.has(extension)) {
+      return sendError(res, "Unsupported checkpoint file extension.", null, 415);
     }
 
-    const targetPath = path.join(destDir, req.file.originalname);
-    fs.renameSync(req.file.path, targetPath);
+    const found = await db.query("SELECT category FROM ml_models WHERE model_id = $1", [modelId]);
+    if (found.rows.length === 0) {
+      return sendError(res, "Model is not registered.", null, 404);
+    }
+    if (!["classification", "segmentation"].includes(found.rows[0].category)) {
+      return sendError(res, "Weights may only be uploaded for trainable models.", null, 400);
+    }
 
-    const relativePath = path.relative(projectRoot, targetPath).replace(/\\/g, "/");
+    const destDir = path.join(projectRoot, "models", modelId.toLowerCase());
+    await fs.promises.mkdir(destDir, { recursive: true });
+    finalPath = path.join(destDir, `${randomUUID()}${extension}`);
+    await fs.promises.rename(req.file.path, finalPath);
 
-    // Update PostgreSQL model registry
-    await db.query(
+    const relativePath = path.relative(projectRoot, finalPath).replace(/\\/g, "/");
+    // Uploading a file is not model validation or deployment; never auto-mark Active.
+    const update = await db.query(
       `UPDATE ml_models
-       SET weights_path = $1, status = 'Active', updated_at = CURRENT_TIMESTAMP
-       WHERE model_id = $2`,
+       SET weights_path = $1, status = 'Pending Validation', updated_at = CURRENT_TIMESTAMP
+       WHERE model_id = $2 RETURNING model_id`,
       [relativePath, modelId]
     );
+    if (update.rows.length === 0) throw new Error("Model registry update did not complete.");
+    registered = true;
 
-    // Audit log
     try {
       await db.query(
         `INSERT INTO audit_records (patient_id, action, user_email, user_name, role, notes)
          VALUES (NULL, 'MODEL_WEIGHTS_UPDATE', $1, $2, $3, $4)`,
-        [
-          req.user ? req.user.email : "admin@clinicalatlas.demo",
-          req.user ? req.user.full_name : "System Administrator",
-          req.user ? req.user.role : "technician",
-          `Uploaded new model weights for ${modelId} (${req.file.originalname}, ${req.file.size} bytes).`
-        ]
+        [req.user.email, req.user.full_name, req.user.role,
+         `Checkpoint staged for model ${modelId} (${req.file.size} bytes), pending validation.`]
       );
-    } catch {}
+    } catch (err) {
+      console.warn("[ModelUpload] Unable to write audit record:", err.message);
+    }
 
     return sendSuccess(res, {
       modelId,
       filename: req.file.originalname,
+      storedFilename: path.basename(finalPath),
       weightsPath: relativePath,
       sizeBytes: req.file.size,
-    }, "Model weights uploaded and integrated successfully.");
+      deploymentStatus: "Pending Validation",
+    }, "Model weights stored; validation required before activation.");
   } catch (err) {
-    return sendError(res, "Failed to upload model weights.", err, 500);
+    console.error("[ModelUpload] Upload failed:", err.message);
+    return sendError(res, "Failed to upload model weights.", null, 500);
+  } finally {
+    // Multer stages the temporary file before entering this controller.
+    if (req.file?.path) await fs.promises.unlink(req.file.path).catch(() => {});
+    if (finalPath && !registered) await fs.promises.unlink(finalPath).catch(() => {});
   }
 };
 

@@ -3,39 +3,42 @@ import { Link } from 'wouter';
 import AppLayout from '@/layouts/AppLayout';
 import EmptyState from '@/components/common/EmptyState';
 import StatusPill from '@/components/common/StatusPill';
-import { getDashboardStats, getPatients, getModels } from '@/services/api';
-import { Heart, ScanLine, Brain, Box, Target, FileText, ArrowRight } from 'lucide-react';
+import { SkeletonCard, SkeletonTableRow } from '@/components/common/LoadingSkeleton';
+import { getDashboardStats, getPatients, getModelStatusApi } from '@/services/api';
+import { useAuthStore } from '@/store/useAppStore';
+import { ArrowRight, UserPlus, Database, Activity, ShieldCheck, Box } from 'lucide-react';
 
 const workflowStages = [
-  { num: '01', title: 'Medical imaging', path: '/imaging', status: 'Awaiting case' },
-  { num: '02', title: 'AI analysis', path: '/models', status: 'Not trained' },
-  { num: '03', title: '3D reconstruction', path: '/reconstruction', status: 'Ready for mask' },
-  { num: '04', title: 'Knee planning', path: '/planning', status: 'Pending review' },
-  { num: '05', title: 'Review & export', path: '/reports', status: 'Awaiting plan' },
+  { num: '01', title: 'Upload Imaging', path: '/imaging', status: 'DICOM & planar series' },
+  { num: '02', title: 'Review AI Analysis', path: '/ai-analysis', status: 'Radiographic classification' },
+  { num: '03', title: 'Build 3D Model', path: '/reconstruction', status: 'Patient-specific anatomy' },
+  { num: '04', title: 'Plan Knee Alignment', path: '/planning', status: 'Kinematic resection targets' },
+  { num: '05', title: 'Review & Export', path: '/reports', status: 'Clinical report dossier' },
 ];
 
 export default function Dashboard() {
+  const { user } = useAuthStore();
   const [stats, setStats] = useState(null);
   const [patients, setPatients] = useState([]);
-  const [models, setModels] = useState([]);
+  const [modelStatus, setModelStatus] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
     async function loadData() {
       try {
-        const [statsData, patientsData, modelsData] = await Promise.all([
+        const [statsData, patientsData, statusData] = await Promise.all([
           getDashboardStats().catch(() => null),
           getPatients().catch(() => []),
-          getModels().catch(() => []),
+          getModelStatusApi().catch(() => null),
         ]);
         if (isMounted) {
           setStats(statsData);
           setPatients(patientsData || []);
-          setModels(modelsData || []);
+          setModelStatus(statusData);
           setLoading(false);
         }
-      } catch (err) {
+      } catch {
         if (isMounted) setLoading(false);
       }
     }
@@ -45,268 +48,256 @@ export default function Dashboard() {
     };
   }, []);
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  const displayName = user?.name || 'Researcher';
+
   const kpis = [
-    { label: 'Patients', value: stats?.totalPatients ?? (patients.length || 0) },
-    { label: 'Imaging studies', value: stats?.totalStudies ?? 0 },
-    { label: '3D reconstructions', value: stats?.completedSegmentations ?? 0 },
-    { label: 'Approved plans', value: stats?.approvedPlans ?? 0 },
+    { label: 'Total patients', value: stats?.totalPatients ?? (patients.length || 0), sub: 'Registered cohort' },
+    { label: 'Imaging studies', value: stats?.totalStudies ?? 0, sub: 'Cross-sectional & planar series' },
+    { label: '3D reconstructions', value: stats?.completedReconstructions ?? 0, sub: 'Anatomical surface meshes' },
+    { label: 'Approved plans', value: stats?.approvedPlans ?? 0, sub: 'Preoperative surgical plans' },
   ];
 
   return (
     <AppLayout>
-      {/* Page Heading */}
-      <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-7">
-        <div>
-          <h1
-            className="text-[31px] font-serif font-normal leading-[1.2] tracking-[-.5px] mb-2"
-            style={{ color: 'var(--ka-ink-strong)' }}
-          >
-            Workspace overview
-          </h1>
-          <p className="text-[13px] m-0" style={{ color: 'var(--ka-muted)' }}>
-            A calm, organized place to manage knee imaging and reconstruction research.
-          </p>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-[15px] mb-[26px]">
-        {kpis.map((kpi, idx) => (
-          <div
-            key={idx}
-            className="bg-white rounded-[12px] p-[21px] border"
-            style={{
-              borderColor: 'var(--ka-line)',
-              boxShadow: 'var(--ka-soft-shadow)',
-            }}
-          >
-            <div className="text-[12px] mb-[16px]" style={{ color: 'var(--ka-muted)' }}>
-              {kpi.label}
-            </div>
-            <strong
-              className="block font-serif text-[29px] font-normal"
-              style={{ color: 'var(--ka-ink-strong)' }}
-            >
-              {kpi.value}
-            </strong>
-          </div>
-        ))}
-      </div>
-
-      {/* Patient Workflow Stage Panel */}
-      <section
-        className="bg-white rounded-[13px] p-[24px] mb-[20px] border"
-        style={{
-          borderColor: 'var(--ka-line)',
-          boxShadow: 'var(--ka-soft-shadow)',
-        }}
-      >
-        <div className="flex items-center justify-between gap-[14px] mb-[20px]">
+      <div className="space-y-6">
+        {/* Page Heading with Authenticated User Greeting */}
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
           <div>
-            <h2 className="text-[15px] font-bold m-0" style={{ color: 'var(--ka-ink-strong)' }}>
-              Patient workflow
-            </h2>
-            <p className="text-[12px] mt-1 m-0" style={{ color: 'var(--ka-muted)' }}>
-              Workflow stages reflect active cases and verified outputs in your workspace.
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+              {getGreeting()}, {displayName}
+            </h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Welcome to your KneeAxis research workspace.
             </p>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-[10px]">
-          {workflowStages.map((stage, idx) => (
-            <Link key={idx} href={stage.path}>
-              <div
-                className="p-[15px] rounded-[10px] border transition-all cursor-pointer hover:bg-slate-50"
-                style={{
-                  background: '#f7f9fb',
-                  borderColor: '#edf0f3',
-                }}
-              >
-                <span className="font-serif text-[22px] font-normal" style={{ color: 'var(--ka-brand)' }}>
-                  {stage.num}
-                </span>
-                <b className="block text-[12px] my-[6px] truncate" style={{ color: 'var(--ka-ink-strong)' }}>
-                  {stage.title}
-                </b>
-                <span className="text-[11px]" style={{ color: 'var(--ka-muted)' }}>
-                  {stage.status}
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* Wide Panels: Recent Patients & AI Integration */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-[19px]">
-        {/* Left Panel: Recent Patients */}
-        <section
-          className="bg-white rounded-[13px] p-[24px] border"
-          style={{
-            borderColor: 'var(--ka-line)',
-            boxShadow: 'var(--ka-soft-shadow)',
-          }}
-        >
-          <div className="flex items-center justify-between mb-[20px]">
-            <div>
-              <h2 className="text-[15px] font-bold m-0" style={{ color: 'var(--ka-ink-strong)' }}>
-                Recent patients
-              </h2>
-              <p className="text-[12px] mt-1 m-0" style={{ color: 'var(--ka-muted)' }}>
-                Linked to the patient registry and studies in your workspace.
-              </p>
-            </div>
-            <Link href="/patients">
-              <span
-                className="inline-flex items-center gap-1 text-[12px] font-bold hover:underline cursor-pointer"
-                style={{ color: 'var(--ka-brand)' }}
-              >
-                View all <ArrowRight className="w-3.5 h-3.5" />
-              </span>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/patients"
+              className="btn-primary"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Manage patients</span>
             </Link>
           </div>
+        </div>
 
-          {patients && patients.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b" style={{ borderColor: 'var(--ka-line)' }}>
-                    <th className="py-2.5 px-3 text-[11px] font-bold" style={{ color: '#8d9ba6' }}>
-                      Patient ID
-                    </th>
-                    <th className="py-2.5 px-3 text-[11px] font-bold" style={{ color: '#8d9ba6' }}>
-                      Patient
-                    </th>
-                    <th className="py-2.5 px-3 text-[11px] font-bold" style={{ color: '#8d9ba6' }}>
-                      Last updated
-                    </th>
-                    <th className="py-2.5 px-3 text-[11px] font-bold" style={{ color: '#8d9ba6' }}>
-                      Stage
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {patients.slice(0, 5).map((p) => (
-                    <tr
-                      key={p.id || p.patientId}
-                      className="border-b hover:bg-slate-50/70 transition-colors"
-                      style={{ borderColor: '#f0f3f5' }}
-                    >
-                      <td className="py-3 px-3 text-[12px] font-mono">
-                        <Link href={`/patients/${p.id || p.patientId}`}>
-                          <span
-                            className="font-semibold hover:underline cursor-pointer"
-                            style={{ color: 'var(--ka-brand)' }}
-                          >
-                            {p.id || p.patientId}
-                          </span>
-                        </Link>
-                      </td>
-                      <td className="py-3 px-3 text-[12px] font-medium" style={{ color: 'var(--ka-ink-strong)' }}>
-                        {p.name}
-                      </td>
-                      <td className="py-3 px-3 text-[12px]" style={{ color: 'var(--ka-muted)' }}>
-                        {p.lastUpdated || 'Recent'}
-                      </td>
-                      <td className="py-3 px-3 text-[12px]">
-                        <StatusPill variant={p.reviewStatus === 'Approved' ? 'success' : 'pending'}>
-                          {p.reviewStatus || 'In Progress'}
-                        </StatusPill>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {loading ? (
+            <>
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </>
           ) : (
-            <EmptyState
-              icon="♡"
-              title="No patients yet"
-              description="Patient records will appear here when added through your application."
-              actionHref="/patients"
-              actionLabel="View patients"
-            />
+            kpis.map((kpi, idx) => (
+              <div
+                key={idx}
+                className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs"
+              >
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                  {kpi.label}
+                </div>
+                <div className="text-3xl font-bold text-slate-900 mb-1">
+                  {kpi.value}
+                </div>
+                <div className="text-xs text-slate-400">
+                  {kpi.sub}
+                </div>
+              </div>
+            ))
           )}
+        </div>
+
+        {/* Patient Workflow Stage Panel */}
+        <section className="bg-white rounded-xl p-6 border border-slate-200 shadow-xs">
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
+                Clinical Workflow Pipeline
+              </h2>
+              <p className="text-sm text-slate-500 mt-0.5">
+                Structured stages from medical imaging to individualized kinematic alignment (iKA) surgical plans.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            {workflowStages.map((stage, idx) => (
+              <Link key={idx} href={stage.path}>
+                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-[#EAF4F6]/50 hover:border-[#0082A6]/40 transition-all cursor-pointer">
+                  <span className="font-mono text-xl font-bold text-[#0082A6] block">
+                    {stage.num}
+                  </span>
+                  <strong className="block text-sm font-semibold text-slate-900 my-1 truncate">
+                    {stage.title}
+                  </strong>
+                  <span className="text-xs text-slate-500">
+                    {stage.status}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
         </section>
 
-        {/* Right Panel: AI Integration */}
-        <section
-          className="bg-white rounded-[13px] p-[24px] border flex flex-col justify-between"
-          style={{
-            borderColor: 'var(--ka-line)',
-            boxShadow: 'var(--ka-soft-shadow)',
-          }}
-        >
-          <div>
-            <div className="flex items-center justify-between mb-[20px]">
+        {/* Wide Panels: Recent Patients & AI Integration */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Panel: Recent Patients (7 cols) */}
+          <section className="lg:col-span-7 bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
               <div>
-                <h2 className="text-[15px] font-bold m-0" style={{ color: 'var(--ka-ink-strong)' }}>
-                  AI integration
+                <h2 className="text-lg font-bold text-slate-900">
+                  Recent Patient Records
                 </h2>
-                <p className="text-[12px] mt-1 m-0" style={{ color: 'var(--ka-muted)' }}>
-                  Training status, not manufactured performance.
+                <p className="text-sm text-slate-500 mt-0.5">
+                  Active patient cases in your workspace.
                 </p>
               </div>
-              <Link href="/models">
-                <span
-                  className="text-[12px] font-bold hover:underline cursor-pointer"
-                  style={{ color: 'var(--ka-brand)' }}
-                >
-                  Manage ↗
+              <Link href="/patients">
+                <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#0082A6] hover:text-[#005C9A] cursor-pointer">
+                  View all <ArrowRight className="w-4 h-4" />
                 </span>
               </Link>
             </div>
 
-            <div className="space-y-[10px]">
-              <div
-                className="flex items-center justify-between p-[13px] rounded-[11px] border"
-                style={{
-                  background: '#f8fafb',
-                  borderColor: '#e1e8ee',
-                }}
-              >
+            {loading ? (
+              <div className="space-y-2">
+                <table className="w-full">
+                  <tbody>
+                    <SkeletonTableRow columns={4} />
+                    <SkeletonTableRow columns={4} />
+                    <SkeletonTableRow columns={4} />
+                  </tbody>
+                </table>
+              </div>
+            ) : patients && patients.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      <th className="py-2.5 px-3">Patient ID</th>
+                      <th className="py-2.5 px-3">Name</th>
+                      <th className="py-2.5 px-3">Knee</th>
+                      <th className="py-2.5 px-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {patients.slice(0, 5).map((p) => {
+                      const pId = p.id || p.patientId;
+                      const pSide = p.kneeSide || p.affectedKnee || p.side || 'Right';
+                      return (
+                        <tr
+                          key={pId}
+                          className="hover:bg-slate-50 transition-colors"
+                        >
+                          <td className="py-3 px-3 font-mono font-medium text-[#0082A6]">
+                            <Link href={`/patients/${pId}`}>
+                              <span className="hover:underline cursor-pointer">
+                                {pId}
+                              </span>
+                            </Link>
+                          </td>
+                          <td className="py-3 px-3 font-medium text-slate-900">
+                            {p.name}
+                          </td>
+                          <td className="py-3 px-3 text-slate-600">
+                            {pSide} Knee
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                              p.reviewStatus === 'Approved'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            }`}>
+                              {p.reviewStatus || 'Draft'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState
+                icon="♡"
+                title="No patients added yet"
+                description="Your workspace currently has no patient records. Enroll a patient to begin analysis."
+                actionHref="/patients"
+                actionLabel="Enroll Patient"
+              />
+            )}
+          </section>
+
+          {/* Right Panel: AI Capabilities Status (5 cols) */}
+          <section className="lg:col-span-5 bg-white rounded-xl p-6 border border-slate-200 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
                 <div>
-                  <strong className="block text-[12px]" style={{ color: 'var(--ka-ink)' }}>
-                    KL classification
-                  </strong>
-                  <span className="text-[11px]" style={{ color: 'var(--ka-muted)' }}>
-                    ResNet50 / X-ray
-                  </span>
+                  <h2 className="text-lg font-bold text-slate-900">
+                    AI Analysis Capabilities
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-0.5">
+                    Current availability of research models.
+                  </p>
                 </div>
-                <StatusPill variant="pending">Not trained</StatusPill>
+                <Link href="/ai-analysis">
+                  <span className="text-sm font-semibold text-[#0082A6] hover:text-[#005C9A] cursor-pointer">
+                    AI Analysis ↗
+                  </span>
+                </Link>
               </div>
 
-              <div
-                className="flex items-center justify-between p-[13px] rounded-[11px] border"
-                style={{
-                  background: '#f8fafb',
-                  borderColor: '#e1e8ee',
-                }}
-              >
-                <div>
-                  <strong className="block text-[12px]" style={{ color: 'var(--ka-ink)' }}>
-                    3D knee segmentation
-                  </strong>
-                  <span className="text-[11px]" style={{ color: 'var(--ka-muted)' }}>
-                    Attention 3D U-Net / MRI
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 bg-slate-50/70">
+                  <div>
+                    <strong className="block text-sm font-semibold text-slate-900">
+                      KL Radiographic Classifier
+                    </strong>
+                    <span className="text-xs text-slate-500">
+                      ResNet-50 • Bilateral X-Ray (0–4)
+                    </span>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold text-amber-800 bg-amber-100/80 border border-amber-200">
+                    Training Pending
                   </span>
                 </div>
-                <StatusPill variant="pending">Not trained</StatusPill>
+
+                <div className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 bg-slate-50/70">
+                  <div>
+                    <strong className="block text-sm font-semibold text-slate-900">
+                      3D Knee Bone Segmentation
+                    </strong>
+                    <span className="text-xs text-slate-500">
+                      3D U-Net • 5-Class OAIZIB-CM
+                    </span>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold text-amber-800 bg-amber-100/80 border border-amber-200">
+                    Training Pending
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div
-            className="mt-6 p-3 rounded-[10px] text-[11px] leading-[1.6] border"
-            style={{
-              background: '#f8fafb',
-              borderColor: '#e1e8ee',
-              color: '#647787',
-            }}
-          >
-            A deployed inference service should determine when a model becomes ready. Model actions remain disabled until validated weights exist.
-          </div>
-        </section>
+            <div className="mt-6 p-4 rounded-xl text-xs leading-relaxed border border-slate-200 bg-slate-50 text-slate-600">
+              <div className="flex items-center gap-1.5 font-bold text-slate-800 mb-1">
+                <ShieldCheck className="w-4 h-4 text-[#0082A6]" />
+                <span>Clinical Readiness Note</span>
+              </div>
+              Anatomical surface models are available using validated segmentation masks. AI inference capabilities will activate once verified model weights are deployed.
+            </div>
+          </section>
+        </div>
       </div>
     </AppLayout>
   );

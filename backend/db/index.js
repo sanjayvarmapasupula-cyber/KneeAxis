@@ -3,7 +3,8 @@ import { newDb } from "pg-mem";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { getSeedUsers, seedPatients, seedModels } from "./seedData.js";
+import { getSeedUsers, seedModels } from "./seedData.js";
+import { maskDatabaseUrl } from "../config/env.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,6 +13,137 @@ const { Pool } = pg;
 
 let pool = null;
 let dbMode = "disconnected"; // 'postgresql' | 'pg-mem' | 'disconnected'
+
+const SNAPSHOT_DIR = path.join(__dirname, "../data");
+const SNAPSHOT_PATH = path.join(SNAPSHOT_DIR, "db_snapshot.json");
+
+// Automated tests must never restore or persist development snapshots.
+const isIsolatedTest = () =>
+  process.env.NODE_ENV === "test" || process.env.USE_ISOLATED_TEST_DB === "true";
+
+const SNAPSHOT_TABLES = [
+  "users",
+  "sessions",
+  "password_reset_tokens",
+  "user_settings",
+  "patients",
+  "imaging_studies",
+  "predictions",
+  "segmentation_jobs",
+  "meshes",
+  "planning_records",
+  "audit_records",
+  "ml_models",
+];
+
+let snapshotTimer = null;
+
+export const scheduleSnapshot = () => {
+  if (dbMode !== "pg-mem" || isIsolatedTest()) return;
+  if (snapshotTimer) clearTimeout(snapshotTimer);
+  snapshotTimer = setTimeout(() => {
+    saveSnapshot().catch((err) => {
+      console.error("[PostgreSQL Snapshot] Async error saving snapshot:", err.message);
+    });
+  }, 250);
+};
+
+export const saveSnapshot = async () => {
+  if (!pool || dbMode !== "pg-mem" || isIsolatedTest()) return;
+  try {
+    if (!fs.existsSync(SNAPSHOT_DIR)) {
+      fs.mkdirSync(SNAPSHOT_DIR, { recursive: true });
+    }
+
+    const data = {
+      version: "1.0.0",
+      savedAt: new Date().toISOString(),
+      tables: {},
+    };
+
+    for (const table of SNAPSHOT_TABLES) {
+      try {
+        const res = await pool.query(`SELECT * FROM ${table}`);
+        data.tables[table] = res.rows;
+      } catch {
+        data.tables[table] = [];
+      }
+    }
+
+    fs.writeFileSync(SNAPSHOT_PATH, JSON.stringify(data, null, 2), "utf-8");
+  } catch (err) {
+    console.error("[PostgreSQL Snapshot] Failed to save snapshot:", err.message);
+  }
+};
+
+export const restoreSnapshot = async () => {
+  if (isIsolatedTest() || !fs.existsSync(SNAPSHOT_PATH)) {
+    return false;
+  }
+  try {
+    const raw = fs.readFileSync(SNAPSHOT_PATH, "utf-8");
+    const snapshot = JSON.parse(raw);
+    if (!snapshot || !snapshot.tables) return false;
+
+    let restoredCount = 0;
+    const userIdMap = new Map();
+
+    for (const table of SNAPSHOT_TABLES) {
+      const rows = snapshot.tables[table];
+      if (!Array.isArray(rows) || rows.length === 0) continue;
+
+      for (const row of rows) {
+        const rowCopy = { ...row };
+        const oldId = rowCopy.id;
+
+        // Map foreign key user_id if applicable
+        if (table === "sessions" || table === "password_reset_tokens" || table === "user_settings") {
+          if (rowCopy.user_id && userIdMap.has(rowCopy.user_id)) {
+            rowCopy.user_id = userIdMap.get(rowCopy.user_id);
+          }
+        }
+        if (table === "patients" && rowCopy.created_by && userIdMap.has(rowCopy.created_by)) {
+          rowCopy.created_by = userIdMap.get(rowCopy.created_by);
+        }
+
+        // For SERIAL tables in pg-mem, delete 'id' so pg-mem sequence generates it and increments
+        delete rowCopy.id;
+
+        const cols = Object.keys(rowCopy);
+        const vals = Object.values(rowCopy);
+        const placeholders = cols.map((_, i) => `$${i + 1}`).join(", ");
+        const colList = cols.join(", ");
+        const preparedVals = vals.map((v) =>
+          v !== null && typeof v === "object" ? JSON.stringify(v) : v
+        );
+
+        try {
+          const insertRes = await pool.query(
+            `INSERT INTO ${table} (${colList}) VALUES (${placeholders}) ON CONFLICT DO NOTHING RETURNING id`,
+            preparedVals
+          );
+          if (insertRes.rows && insertRes.rows.length > 0) {
+            const newId = insertRes.rows[0].id;
+            if (table === "users" && oldId) {
+              userIdMap.set(oldId, newId);
+            }
+          }
+          restoredCount++;
+        } catch {
+          // ignore duplicate conflict
+        }
+      }
+    }
+
+    console.log(
+      `[PostgreSQL Persistence] Restored database snapshot from disk (${restoredCount} total records across tables).`
+    );
+    return restoredCount > 0;
+  } catch (err) {
+    console.error("[PostgreSQL Persistence] Error restoring snapshot:", err.message);
+    return false;
+  }
+};
 
 /**
  * Execute a SQL query using the active pool.
@@ -22,7 +154,21 @@ export const query = async (text, params = []) => {
   if (!pool) {
     throw new Error("Database pool is not initialized. Call initDatabase() first.");
   }
-  return pool.query(text, params);
+  const result = await pool.query(text, params);
+
+  // If in pg-mem mode and the query mutated data, trigger debounced snapshot save
+  if (dbMode === "pg-mem") {
+    const trimmed = text.trim().toUpperCase();
+    if (
+      trimmed.startsWith("INSERT") ||
+      trimmed.startsWith("UPDATE") ||
+      trimmed.startsWith("DELETE")
+    ) {
+      scheduleSnapshot();
+    }
+  }
+
+  return result;
 };
 
 export const getClient = async () => {
@@ -36,80 +182,32 @@ export const getDbMode = () => dbMode;
 export const isOnline = () => dbMode !== "disconnected";
 
 /**
- * Seeds initial clinical data into the database if empty.
+ * Seeds initial baseline data (Admin accounts & Model Registry entries) if empty.
+ * ZERO clinical demo records (patients, studies, plans, audits) are seeded.
  */
 async function seedInitialData() {
   try {
-    // 1. Seed Users (Ensure all required clinical staff accounts are active)
-    const seedUsers = await getSeedUsers();
-    for (const u of seedUsers) {
-      await query(
-        `INSERT INTO users (email, password_hash, full_name, role, department, avatar_url)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT (email) DO UPDATE SET
-           password_hash = EXCLUDED.password_hash,
-           full_name = EXCLUDED.full_name,
-           role = EXCLUDED.role,
-           department = EXCLUDED.department,
-           avatar_url = EXCLUDED.avatar_url`,
-        [u.email, u.password_hash, u.full_name, u.role, u.department, u.avatar_url]
-      );
-    }
-    console.log(`[PostgreSQL Seed] Active clinical user accounts verified (${seedUsers.length} accounts).`);
-
-    // 2. Seed Patients
-    const patientCountRes = await query("SELECT COUNT(*) AS count FROM patients");
-    const patientCount = parseInt(patientCountRes.rows[0].count, 10);
-    if (patientCount === 0) {
-      console.log("[PostgreSQL Seed] Seeding initial patient records...");
-      for (const p of seedPatients) {
+    // 1. Seed Users (Ensure baseline staff accounts exist in development/test unless explicitly opted in)
+    if (process.env.NODE_ENV !== "production" || process.env.ALLOW_DEMO_SEED === "true") {
+      const seedUsers = await getSeedUsers();
+      for (const u of seedUsers) {
         await query(
-          `INSERT INTO patients (patient_id, name, age, gender, affected_knee, urgency, clinical_notes, imaging_status, segmentation_status, reconstruction_status, review_status)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-           ON CONFLICT (patient_id) DO NOTHING`,
-          [
-            p.patient_id,
-            p.name,
-            p.age,
-            p.gender,
-            p.affected_knee,
-            p.urgency,
-            p.clinical_notes,
-            p.imaging_status,
-            p.segmentation_status,
-            p.reconstruction_status,
-            p.review_status,
-          ]
-        );
-
-        // Seed imaging study for each patient
-        await query(
-          `INSERT INTO imaging_studies (study_id, patient_id, modality, study_type, slice_count, pixel_spacing, slice_thickness, kvp, ma)
-           VALUES ($1, $2, 'CT', 'Pre-Op High-Res Knee Protocol', 420, '0.625 x 0.625 mm', '0.5 mm', 120, 250)
-           ON CONFLICT (study_id) DO NOTHING`,
-          [`CT-${p.patient_id}`, p.patient_id]
-        );
-
-        // Seed planning record
-        await query(
-          `INSERT INTO planning_records (
-            patient_id, status, resection_depth_femur_mm, resection_depth_tibia_mm,
-            varus_valgus_angle_deg, flexion_extension_angle_deg, internal_external_rotation_deg,
-            implant_size_femur, implant_size_tibia, poly_thickness_mm, joint_line_delta_mm,
-            native_mldfa, native_mmpta, planned_by, notes
-          ) VALUES ($1, $2, 8.5, 9.0, 0.0, 3.0, 0.0, 'Size 5', 'Size 4', 10.0, 0.0, 88.5, 86.5, 'Dr. Sarah Mitchell', 'Kinematically aligned resection plan verified with ROSA navigation.')
-          ON CONFLICT (patient_id) DO NOTHING`,
-          [p.patient_id, p.review_status === 'Approved' ? 'Approved' : 'Draft']
+          `INSERT INTO users (email, password_hash, full_name, role, department, avatar_url, account_status)
+           VALUES ($1, $2, $3, $4, $5, $6, 'active')
+           ON CONFLICT (email) DO NOTHING`,
+          [u.email, u.password_hash, u.full_name, u.role, u.department, u.avatar_url]
         );
       }
-      console.log(`[PostgreSQL Seed] ${seedPatients.length} patient records seeded.`);
+      console.log(`[PostgreSQL Seed] Active staff accounts verified (${seedUsers.length} accounts).`);
+    } else {
+      console.log("[PostgreSQL Seed] Predictable demo accounts seeding disabled in production.");
     }
 
-    // 3. Seed ML Models
+    // 2. Seed ML Models (Registered with status: "Not Trained" and accuracy: null)
     const modelCountRes = await query("SELECT COUNT(*) AS count FROM ml_models");
     const modelCount = parseInt(modelCountRes.rows[0].count, 10);
     if (modelCount === 0) {
-      console.log("[PostgreSQL Seed] Registering AI & Algorithmic models into ML Model Registry...");
+      console.log("[PostgreSQL Seed] Registering AI models into ML Registry (status: Not Trained)...");
       for (const m of seedModels) {
         await query(
           `INSERT INTO ml_models (
@@ -140,22 +238,8 @@ async function seedInitialData() {
       console.log(`[PostgreSQL Seed] ${seedModels.length} models registered.`);
     }
 
-    // 4. Seed initial audit log entry
-    const auditCountRes = await query("SELECT COUNT(*) AS count FROM audit_records");
-    if (parseInt(auditCountRes.rows[0].count, 10) === 0) {
-      await query(
-        `INSERT INTO audit_records (patient_id, action, user_email, user_name, role, notes)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [
-          "MRN-ROSA-0568",
-          "SURGICAL_PLAN_APPROVAL",
-          "dr.mitchell@clinicalatlas.demo",
-          "Dr. Sarah Mitchell",
-          "surgeon",
-          "Pre-operative kinematic alignment resection plan verified and signed off for ROSA Robotic Suite."
-        ]
-      );
-    }
+    // NOTE: ZERO clinical patient records, imaging studies, or planning records are seeded.
+    // The fresh application starts with authentic zero counts.
   } catch (err) {
     console.error(`[PostgreSQL Seed] Error during data seeding: ${err.message}`, err);
   }
@@ -163,54 +247,101 @@ async function seedInitialData() {
 
 /**
  * Initialize PostgreSQL database:
- * 1. Attempts connection to external PostgreSQL (DATABASE_URL or localhost)
- * 2. If unavailable, initializes embedded pg-mem engine
- * 3. Applies DDL schema
- * 4. Seeds default data
+ * 1. For isolated testing (NODE_ENV=test), initializes isolated in-process test engine.
+ * 2. For normal operation, connects directly to external PostgreSQL (DATABASE_URL).
+ * 3. Never reports false connection if PostgreSQL is unavailable.
  */
 export const initDatabase = async () => {
+  const isTest = process.env.NODE_ENV === "test" || process.env.USE_ISOLATED_TEST_DB === "true";
   const dbUrl = process.env.DATABASE_URL;
 
-  // Try real PostgreSQL connection first if configured or available
-  let connectedReal = false;
-  try {
-    const realPool = new Pool({
-      connectionString: dbUrl || "postgresql://postgres:postgres@localhost:5432/clinical_atlas",
-      connectionTimeoutMillis: 1800,
-      idleTimeoutMillis: 10000,
-    });
-
-    const testClient = await realPool.connect();
-    await testClient.query("SELECT 1 AS alive");
-    testClient.release();
-
-    pool = realPool;
-    dbMode = "postgresql";
-    connectedReal = true;
-    console.log(`[PostgreSQL] Connected to active PostgreSQL server: ${dbUrl ? "Custom DATABASE_URL" : "localhost:5432"}`);
-  } catch (err) {
-    // console.log(`[PostgreSQL] Native PostgreSQL server offline (${err.message}). Starting in-process PostgreSQL engine...`);
-  }
-
-  // If real PostgreSQL is not available, launch in-process PostgreSQL engine (pg-mem)
-  if (!connectedReal) {
+  // 1. If in test mode, launch isolated in-process pg-mem engine directly
+  if (isTest) {
     try {
       const memDb = newDb();
-
-      // Register standard postgres helper functions if needed
       memDb.public.registerFunction({
-        name: 'version',
-        implementation: () => 'PostgreSQL 16.2 (pg-mem in-process engine for Clinical Atlas)',
+        name: "version",
+        implementation: () => "PostgreSQL 16.2 (pg-mem isolated test fixture)",
       });
 
       const pgAdapter = memDb.adapters.createPg();
       pool = new pgAdapter.Pool();
       dbMode = "pg-mem";
-      console.log("[PostgreSQL] In-process PostgreSQL engine initialized successfully (PostgreSQL 16 dialect).");
+      console.log("[PostgreSQL] Isolated test database engine initialized (NODE_ENV=test).");
     } catch (memErr) {
-      console.error("[PostgreSQL] Failed to initialize in-process database engine:", memErr);
+      console.error("[PostgreSQL] Failed to initialize isolated test database engine:", memErr);
       dbMode = "disconnected";
       throw memErr;
+    }
+  } else {
+    // 2. Normal application mode: Must connect to actual PostgreSQL server
+    if (!dbUrl && process.env.NODE_ENV === "production") {
+      dbMode = "disconnected";
+      throw new Error(
+        "[PostgreSQL Configuration Error] DATABASE_URL must be explicitly configured in production. Fallback connections are disallowed."
+      );
+    }
+
+    const targetUrl = dbUrl || process.env.DATABASE_URL;
+    if (!targetUrl) {
+      if (process.env.ALLOW_OFFLINE_FALLBACK === "true") {
+        console.warn("[PostgreSQL] Offline development fallback active (ALLOW_OFFLINE_FALLBACK=true).");
+        const memDb = newDb();
+        memDb.public.registerFunction({
+          name: "version",
+          implementation: () => "PostgreSQL 16.2 (pg-mem offline fallback)",
+        });
+        const pgAdapter = memDb.adapters.createPg();
+        pool = new pgAdapter.Pool();
+        dbMode = "pg-mem";
+        return { mode: dbMode, pool };
+      }
+      dbMode = "disconnected";
+      throw new Error(
+        "[PostgreSQL Configuration Error] DATABASE_URL is not set. Please configure DATABASE_URL in backend/.env"
+      );
+    }
+
+    const maskedUrl = maskDatabaseUrl(targetUrl);
+
+    try {
+      const realPool = new Pool({
+        connectionString: targetUrl,
+        connectionTimeoutMillis: 3000,
+        idleTimeoutMillis: 10000,
+      });
+
+      const testClient = await realPool.connect();
+      await testClient.query("SELECT 1 AS alive");
+      testClient.release();
+
+      pool = realPool;
+      dbMode = "postgresql";
+      console.log(`[PostgreSQL] Connected to active PostgreSQL server: ${maskedUrl}`);
+    } catch (pgErr) {
+      console.warn(`[PostgreSQL] Connection to server at ${maskedUrl} failed: ${pgErr.message}`);
+
+      // Allow offline in-process fallback ONLY if explicitly set in environment
+      if (process.env.ALLOW_OFFLINE_FALLBACK === "true") {
+        console.warn("[PostgreSQL] Offline development fallback active (ALLOW_OFFLINE_FALLBACK=true).");
+        const memDb = newDb();
+        memDb.public.registerFunction({
+          name: "version",
+          implementation: () => "PostgreSQL 16.2 (pg-mem offline fallback)",
+        });
+        const pgAdapter = memDb.adapters.createPg();
+        pool = new pgAdapter.Pool();
+        dbMode = "pg-mem";
+      } else {
+        dbMode = "disconnected";
+        console.error("=============================================================================");
+        console.error("[PostgreSQL Connection Required]");
+        console.error("KneeAxis requires a running PostgreSQL server for normal application operation.");
+        console.error(`Target: ${maskedUrl}`);
+        console.error("Please ensure PostgreSQL is running and configure DATABASE_URL in backend/.env");
+        console.error("=============================================================================");
+        return { mode: dbMode, pool: null };
+      }
     }
   }
 
@@ -238,11 +369,56 @@ export const initDatabase = async () => {
     }
     console.log("[PostgreSQL] Relational schema applied successfully.");
 
-    // Seed database
-    await seedInitialData();
+    // Automated column migrations for existing PostgreSQL databases
+    if (dbMode === "postgresql") {
+      const migrations = [
+        "ALTER TABLE patients ADD COLUMN IF NOT EXISTS assigned_to INT REFERENCES users(id) ON DELETE SET NULL",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_attempts INT DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP WITH TIME ZONE"
+      ];
+      for (const mig of migrations) {
+        try {
+          await pool.query(mig);
+        } catch (migErr) {
+          console.warn(`[PostgreSQL Migration Notice]: ${migErr.message}`);
+        }
+      }
+    }
+    let hasSnapshot = false;
+    if (dbMode === "pg-mem") {
+      hasSnapshot = await restoreSnapshot();
+    }
+
+    // Seed baseline data if empty (Users + Not Trained models only)
+    if (!hasSnapshot) {
+      await seedInitialData();
+      if (dbMode === "pg-mem") {
+        await saveSnapshot();
+      }
+    } else if (process.env.NODE_ENV !== "production" || process.env.ALLOW_DEMO_SEED === "true") {
+      // Ensure default staff user exists if needed without overwriting in development/test
+      const seedUsers = await getSeedUsers();
+      for (const u of seedUsers) {
+        await query(
+          `INSERT INTO users (email, password_hash, full_name, role, department, avatar_url, account_status)
+           VALUES ($1, $2, $3, $4, $5, $6, 'active')
+           ON CONFLICT (email) DO NOTHING`,
+          [u.email, u.password_hash, u.full_name, u.role, u.department, u.avatar_url]
+        );
+      }
+    }
   } catch (schemaErr) {
     console.error("[PostgreSQL] Error applying database schema:", schemaErr);
   }
+
+  // Flush snapshot on process exit
+  const handleExit = () => {
+    if (dbMode === "pg-mem") {
+      saveSnapshot().catch(() => {});
+    }
+  };
+  process.on("SIGINT", handleExit);
+  process.on("SIGTERM", handleExit);
 
   return { mode: dbMode, pool };
 };
@@ -253,4 +429,7 @@ export default {
   getDbMode,
   isOnline,
   initDatabase,
+  saveSnapshot,
+  restoreSnapshot,
+  scheduleSnapshot,
 };
