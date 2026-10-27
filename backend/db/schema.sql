@@ -10,45 +10,11 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     full_name VARCHAR(255) NOT NULL,
-    role VARCHAR(50) NOT NULL DEFAULT 'researcher',
-    department VARCHAR(100) DEFAULT 'Orthopedic Surgery & Research',
+    role VARCHAR(50) NOT NULL DEFAULT 'surgeon',
+    department VARCHAR(100) DEFAULT 'Orthopedic Surgery',
     avatar_url TEXT,
-    account_status VARCHAR(50) DEFAULT 'active',
     is_active BOOLEAN DEFAULT TRUE,
-    email_verified_at TIMESTAMP WITH TIME ZONE,
-    last_login_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- 1b. User Authentication Sessions
-CREATE TABLE IF NOT EXISTS sessions (
-    id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    session_token VARCHAR(255) UNIQUE NOT NULL,
-    ip_address VARCHAR(100),
-    user_agent TEXT,
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    revoked_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    last_used_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- 1c. Password Reset Tokens
-CREATE TABLE IF NOT EXISTS password_reset_tokens (
-    id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_hash VARCHAR(255) UNIQUE NOT NULL,
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    used_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- 1d. User Settings
-CREATE TABLE IF NOT EXISTS user_settings (
-    user_id INT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    preferred_theme VARCHAR(50) DEFAULT 'light',
-    notification_preferences JSONB DEFAULT '{"email": true, "system": true}'::jsonb,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -58,7 +24,6 @@ CREATE TABLE IF NOT EXISTS patients (
     patient_id VARCHAR(50) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
     age INT NOT NULL,
-    date_of_birth DATE,
     gender VARCHAR(20) NOT NULL,
     affected_knee VARCHAR(20) NOT NULL DEFAULT 'Right',
     clinical_notes TEXT,
@@ -67,8 +32,6 @@ CREATE TABLE IF NOT EXISTS patients (
     segmentation_status VARCHAR(50) DEFAULT 'Completed',
     reconstruction_status VARCHAR(50) DEFAULT 'Completed',
     review_status VARCHAR(50) DEFAULT 'Approved',
-    created_by INT REFERENCES users(id) ON DELETE SET NULL,
-    assigned_to INT REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -197,27 +160,6 @@ CREATE TABLE IF NOT EXISTS ml_models (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 10. Durable Pipeline Jobs
-CREATE TABLE IF NOT EXISTS pipeline_jobs (
-    id SERIAL PRIMARY KEY,
-    job_id VARCHAR(100) UNIQUE NOT NULL,
-    job_type VARCHAR(50) NOT NULL DEFAULT 'research_pipeline',
-    patient_id VARCHAR(50) NOT NULL REFERENCES patients(patient_id) ON DELETE CASCADE,
-    owner_id INT REFERENCES users(id) ON DELETE SET NULL,
-    study_id VARCHAR(100),
-    status VARCHAR(50) NOT NULL DEFAULT 'queued',
-    stage VARCHAR(100),
-    progress INT DEFAULT 0,
-    metadata JSONB DEFAULT '{}',
-    result JSONB DEFAULT NULL,
-    error TEXT DEFAULT NULL,
-    started_at TIMESTAMP WITH TIME ZONE,
-    completed_at TIMESTAMP WITH TIME ZONE,
-    failed_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_patients_patient_id ON patients(patient_id);
 CREATE INDEX IF NOT EXISTS idx_imaging_patient_id ON imaging_studies(patient_id);
@@ -226,10 +168,3 @@ CREATE INDEX IF NOT EXISTS idx_planning_patient_id ON planning_records(patient_i
 CREATE INDEX IF NOT EXISTS idx_audit_patient_id ON audit_records(patient_id);
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_records(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token);
-CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_pwd_reset_token_hash ON password_reset_tokens(token_hash);
-CREATE INDEX IF NOT EXISTS idx_pwd_reset_user_id ON password_reset_tokens(user_id);
-CREATE INDEX IF NOT EXISTS idx_pipeline_jobs_job_id ON pipeline_jobs(job_id);
-CREATE INDEX IF NOT EXISTS idx_pipeline_jobs_patient ON pipeline_jobs(patient_id);
-CREATE INDEX IF NOT EXISTS idx_pipeline_jobs_owner ON pipeline_jobs(owner_id);

@@ -2,24 +2,16 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import { exportApprovedMesh } from "../controllers/auditController.js";
-import { getPatientMeshManifest } from "../controllers/reconstructionController.js";
 import { sendError } from "../utils/response.js";
 import { sanitizeId, getPatientOutputDir, isPathSafe } from "../utils/paths.js";
-import { requirePatientAccess } from "../middleware/patientAuth.js";
 
 const router = express.Router();
-
-/**
- * GET /api/meshes/:patientId
- * Retrieve reconstructed mesh manifest for a patient.
- */
-router.get("/meshes/:patientId", requirePatientAccess, getPatientMeshManifest);
 
 /**
  * GET /api/meshes/:patientId/:filename
  * Safely stream an STL or OBJ mesh to the frontend (Three.js / VTK.js viewer).
  */
-router.get("/meshes/:patientId/:filename", requirePatientAccess, (req, res) => {
+router.get("/meshes/:patientId/:filename", (req, res) => {
   try {
     const patientId = sanitizeId(req.params.patientId);
     const filename = path.basename(req.params.filename); // Strip any directories
@@ -60,6 +52,6 @@ router.get("/meshes/:patientId/:filename", requirePatientAccess, (req, res) => {
  * GET /api/export/:patientId/:filename
  * Export gate requiring clinician approval verification
  */
-router.get("/export/:patientId/:filename", requirePatientAccess, exportApprovedMesh);
+router.get("/export/:patientId/:filename", exportApprovedMesh);
 
 export default router;

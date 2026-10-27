@@ -1,55 +1,70 @@
 import multer from "multer";
 import path from "path";
-import { randomUUID } from "node:crypto";
+import fs from "fs";
 import { getPatientUploadDir, sanitizeId } from "../utils/paths.js";
 
-const ALLOWED_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".dcm", ".nii", ".nii.gz"]);
-
-const getImageExtension = (name) => {
-  const lower = name.toLowerCase();
-  return lower.endsWith(".nii.gz") ? ".nii.gz" : path.extname(lower);
-};
+// Allowed medical image & file extensions
+const ALLOWED_EXTENSIONS = new Set([
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".dcm",
+  ".nii",
+  ".gz", // for .nii.gz
+]);
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     try {
-      // The patient identity comes from the authenticated, patient-scoped route.
-      const patientId = req.params.patientId;
-      if (!patientId || sanitizeId(patientId) !== patientId) {
-        const error = new Error("Valid patient ID is required in the URL.");
-        error.statusCode = 400;
-        return cb(error);
-      }
-      return cb(null, getPatientUploadDir(patientId));
+      const patientId = sanitizeId(req.params.patientId || req.body.patientId || "common");
+      const targetDir = getPatientUploadDir(patientId);
+      cb(null, targetDir);
     } catch (err) {
-      return cb(err);
+      cb(err, null);
     }
   },
   filename: (req, file, cb) => {
-    // Never trust the client-provided filename as a filesystem path.
-    cb(null, `${randomUUID()}${getImageExtension(file.originalname)}`);
+    // Sanitize original filename and append timestamp to prevent overwriting
+    const originalName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const ext = path.extname(originalName).toLowerCase();
+    
+    // Handle .nii.gz composite extension cleanly
+    let cleanName = originalName;
+    if (originalName.toLowerCase().endsWith(".nii.gz")) {
+      cleanName = originalName.slice(0, -7) + `_${Date.now()}.nii.gz`;
+    } else {
+      const base = path.basename(originalName, ext);
+      cleanName = `${base}_${Date.now()}${ext}`;
+    }
+    cb(null, cleanName);
   },
 });
 
 const fileFilter = (req, file, cb) => {
-  const extension = getImageExtension(file.originalname);
-  if (!ALLOWED_EXTENSIONS.has(extension)) {
-    const error = new Error("Unsupported medical image format. Allowed: PNG, JPG, DICOM, NIfTI, NIfTI.GZ.");
-    error.statusCode = 415;
-    return cb(error);
+  const original = file.originalname.toLowerCase();
+  const ext = path.extname(original);
+
+  const isValid =
+    original.endsWith(".nii.gz") ||
+    ALLOWED_EXTENSIONS.has(ext);
+
+  if (isValid) {
+    cb(null, true);
+  } else {
+    cb(
+      new Error(
+        `Unsupported file format: ${ext}. Allowed formats: .png, .jpg, .jpeg, .dcm, .nii, .nii.gz`
+      ),
+      false
+    );
   }
-  return cb(null, true);
 };
 
-// Extension filtering is a first gate, NOT verification of actual DICOM/NIfTI content.
+// 500 MB limit for medical volume data
 export const upload = multer({
   storage,
   fileFilter,
   limits: {
     fileSize: 500 * 1024 * 1024,
-    files: 1,
-    fields: 10,
-    fieldSize: 16 * 1024,
-    parts: 12,
   },
 });

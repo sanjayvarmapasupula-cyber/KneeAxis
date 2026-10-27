@@ -2,7 +2,7 @@ import path from "path";
 import fs from "fs";
 import { runPythonScript } from "./pythonService.js";
 import { jobService } from "./jobService.js";
-import db from "../db/index.js";
+import { Mesh } from "../models/Mesh.js";
 import { WORKSPACE_ROOT, getPatientOutputDir, sanitizeId } from "../utils/paths.js";
 
 /**
@@ -135,31 +135,29 @@ async function executeReconstruction(
     };
   });
 
-  // Store in PostgreSQL
-  let meshRecordId = null;
+  // Store in MongoDB
+  let meshRecord = null;
   try {
-    for (const m of manifestData.meshes || []) {
-      const filePath = m.stl || m.obj || manifestPath;
-      await db.query(
-        `INSERT INTO meshes (patient_id, anatomical_structure, file_path, surface_area_cm2, volume_cm3, quality_score)
-         VALUES ($1, $2, $3, $4, $5, 0.99)`,
-        [
-          patientId,
-          m.name || 'bone_mesh',
-          filePath,
-          Number(((m.surface_area_mm2 || 0) / 100).toFixed(2)),
-          Number(((m.volume_mm3 || 0) / 1000).toFixed(2)),
-        ]
-      );
-    }
-
-    // Update patient table reconstruction status
-    await db.query(
-      `UPDATE patients SET reconstruction_status = 'Completed', updated_at = CURRENT_TIMESTAMP WHERE patient_id = $1`,
-      [patientId]
-    );
+    meshRecord = await Mesh.create({
+      patientId,
+      segmentationPath,
+      manifestPath,
+      qaReportPath: qaPath,
+      structures: (manifestData.meshes || []).map((m) => ({
+        name: m.name,
+        label: m.label,
+        stlPath: m.stl ? path.join(outputDir, m.stl) : null,
+        objPath: m.obj ? path.join(outputDir, m.obj) : null,
+        stlRawPath: m.stl_raw ? path.join(outputDir, m.stl_raw) : null,
+        objRawPath: m.obj_raw ? path.join(outputDir, m.obj_raw) : null,
+        volumeMm3: m.volume_mm3 || 0,
+        surfaceAreaMm2: m.surface_area_mm2 || 0,
+        watertight: m.watertight || false,
+      })),
+      qaSummary: qaData,
+    });
   } catch (dbErr) {
-    console.warn(`[ReconstructionService] Could not persist Mesh record to PostgreSQL: ${dbErr.message}`);
+    console.warn(`[ReconstructionService] Could not persist Mesh record to MongoDB: ${dbErr.message}`);
   }
 
   return {
@@ -169,6 +167,6 @@ async function executeReconstruction(
     qa_summary: qaData,
     manifestPath,
     qaPath,
-    recordId: meshRecordId,
+    recordId: meshRecord ? meshRecord._id : null,
   };
 }

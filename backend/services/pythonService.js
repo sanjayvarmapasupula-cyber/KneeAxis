@@ -13,7 +13,7 @@ import { WORKSPACE_ROOT, BACKEND_ROOT } from "../utils/paths.js";
  */
 export const runPythonScript = (scriptRelativeOrAbsPath, args = [], options = {}) => {
   return new Promise((resolve, reject) => {
-    const pythonExecutable = options.pythonExecutable || process.env.PYTHON_PATH || "python";
+    const pythonExecutable = process.env.PYTHON_PATH || "python";
     const timeoutMs = options.timeoutMs || parseInt(process.env.PYTHON_TIMEOUT_MS, 10) || 180000;
     const parseJson = options.parseJson !== false; // default true
 
@@ -41,7 +41,7 @@ export const runPythonScript = (scriptRelativeOrAbsPath, args = [], options = {}
 
     const child = spawn(pythonExecutable, [scriptPath, ...args], {
       cwd,
-      env: { ...process.env, ...(options.env || {}) },
+      env: { ...process.env },
       windowsHide: true,
     });
 
