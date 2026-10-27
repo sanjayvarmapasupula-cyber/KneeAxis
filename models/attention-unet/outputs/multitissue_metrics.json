@@ -1,0 +1,50 @@
+{
+  "model": "Multi-Tissue Attention U-Net v2",
+  "task": "Bone and Articular Cartilage Multi-Class Segmentation",
+  "num_classes": 7,
+  "class_names": [
+    "Background",
+    "Femur Bone",
+    "Tibia Bone",
+    "Patella Bone",
+    "Femoral Cartilage",
+    "Tibial Cartilage",
+    "Patellar Cartilage"
+  ],
+  "total_parameters": 31388403,
+  "best_overall_dice": 0.9872417413561362,
+  "mean_bone_dice": 0.996686458320141,
+  "mean_cartilage_dice": 0.9777750701884712,
+  "per_class": {
+    "Background": {
+      "dice": 0.9987943049178792,
+      "iou": 0.9975915137358027
+    },
+    "Femur Bone": {
+      "dice": 0.9975573342535105,
+      "iou": 0.9951265726610502
+    },
+    "Tibia Bone": {
+      "dice": 0.9978237050091336,
+      "iou": 0.9956568619678117
+    },
+    "Patella Bone": {
+      "dice": 0.9946783356977792,
+      "iou": 0.9894130117927723
+    },
+    "Femoral Cartilage": {
+      "dice": 0.9833540048306243,
+      "iou": 0.9672531141647175
+    },
+    "Tibial Cartilage": {
+      "dice": 0.9682056485712143,
+      "iou": 0.938370758892995
+    },
+    "Patellar Cartilage": {
+      "dice": 0.981765557163575,
+      "iou": 0.964184195565832
+    }
+  },
+  "training_time_min": 19.73850643237432,
+  "timestamp": "2026-10-27T15:47:40.069748"
+}
