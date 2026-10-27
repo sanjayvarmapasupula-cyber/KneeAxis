@@ -17,7 +17,6 @@ import MedicalDisclaimer from '@/pages/legal/MedicalDisclaimer';
 import Login from '@/pages/Login';
 import Register from '@/pages/auth/Register';
 import ForgotPassword from '@/pages/auth/ForgotPassword';
-import ResetPassword from '@/pages/auth/ResetPassword';
 
 // Authenticated workspace pages
 import Dashboard from '@/pages/Dashboard';
@@ -26,7 +25,6 @@ import PatientDetails from '@/pages/PatientDetails';
 import ImagingViewer from '@/pages/ImagingViewer';
 import AIModels from '@/pages/AIModels';
 import Segmentation from '@/pages/Segmentation';
-import LivePipeline from '@/pages/LivePipeline';
 import Reconstruction from '@/pages/Reconstruction';
 import SurgicalPlanning from '@/pages/SurgicalPlanning';
 import Reports from '@/pages/Reports';
@@ -61,7 +59,6 @@ export default function AppRoutes() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/forgot-password" component={ForgotPassword} />
-      <Route path="/reset-password" component={ResetPassword} />
 
       {/* Workspace Pages (with canonical /app/* and short /* aliases) */}
       <Route path="/dashboard">{() => <Protected component={Dashboard} />}</Route>
@@ -78,7 +75,6 @@ export default function AppRoutes() {
       <Route path="/app/imaging/:id">{() => <Protected component={ImagingViewer} />}</Route>
 
       <Route path="/models">{() => <Protected component={AIModels} />}</Route>
-      <Route path="/ai-analysis">{() => <Protected component={AIModels} />}</Route>
       <Route path="/app/ai-analysis">{() => <Protected component={AIModels} />}</Route>
 
       <Route path="/segmentation">{() => <Protected component={Segmentation} />}</Route>
@@ -106,9 +102,6 @@ export default function AppRoutes() {
 
       <Route path="/settings">{() => <Protected component={Settings} />}</Route>
       <Route path="/app/settings">{() => <Protected component={Settings} />}</Route>
-
-      <Route path="/app/live-pipeline">{() => <Protected component={LivePipeline} />}</Route>
-      <Route path="/live-pipeline">{() => <Protected component={LivePipeline} />}</Route>
 
       {/* 404 Catch-All */}
       <Route path="/404" component={NotFound} />

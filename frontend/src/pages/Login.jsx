@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useAuthStore } from '@/store/useAppStore';
 import AuthLayout from '@/layouts/AuthLayout';
-import PasswordInput from '@/components/auth/PasswordInput';
 import { toast } from 'sonner';
 
 export default function Login() {
@@ -18,23 +17,17 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
-
-    if (!email || !password) {
-      setFormError('Please enter both email and password.');
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
-      const res = await login(email, password, rememberMe);
+      const res = await login(email, password);
       if (res.success) {
         toast.success('Signed in successfully');
         setLocation('/dashboard');
       } else {
         setFormError(res.error || 'Invalid email or password.');
       }
-    } catch {
+    } catch (err) {
       setFormError('An unexpected authentication error occurred. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -46,18 +39,16 @@ export default function Login() {
       <div
         className="w-full max-w-[420px] bg-white rounded-[18px] p-[38px] transition-all font-brand"
         style={{
-          border: '1px solid var(--ka-line, #E2E8F0)',
+          border: '1px solid var(--ka-line)',
           boxShadow: '0 18px 55px rgba(20,40,54,.045)',
         }}
       >
         <div className="mb-5">
-          <Link href="/">
-            <img
-              src="/kneeaxis-logo.png"
-              alt="KneeAxis Medical Alignment"
-              className="h-[36px] w-auto object-contain cursor-pointer"
-            />
-          </Link>
+          <img
+            src="/kneeaxis-logo.png"
+            alt="KneeAxis Medical Alignment"
+            className="h-[36px] w-auto object-contain"
+          />
         </div>
 
         <h1
@@ -66,18 +57,17 @@ export default function Login() {
         >
           Welcome back
         </h1>
-        <p className="text-[13px] mb-[25px]" style={{ color: 'var(--ka-muted, #64748B)' }}>
-          Sign in to access your KneeAxis research workspace.
+        <p className="text-[13px] mb-[25px]" style={{ color: 'var(--ka-muted)' }}>
+          Sign in to your KneeAxis research workspace.
         </p>
 
         {formError && (
           <div
-            role="alert"
             className="p-3 mb-4 rounded-[8px] text-[12px] leading-[1.5]"
             style={{
-              background: 'var(--ka-error-bg, #FFF5F5)',
-              color: 'var(--ka-error, #DC2626)',
-              border: '1px solid #FECACA',
+              background: 'var(--ka-error-bg)',
+              color: 'var(--ka-error)',
+              border: '1px solid #f5c2c7',
             }}
           >
             {formError}
@@ -85,16 +75,14 @@ export default function Login() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-[16px]">
-          <div>
-            <label
-              htmlFor="login-email"
+          <label className="block">
+            <span
               className="block text-[12px] font-bold mb-[7px]"
               style={{ color: '#0B1E2E' }}
             >
               Email address
-            </label>
+            </span>
             <input
-              id="login-email"
               type="email"
               required
               name="email"
@@ -104,32 +92,45 @@ export default function Login() {
               placeholder="name@example.com"
               className="w-full min-h-[44px] rounded-[10px] px-[14px] py-[10px] text-[14px] border outline-none transition-colors"
               style={{
-                borderColor: 'var(--ka-line, #E2E8F0)',
+                borderColor: 'var(--ka-line)',
                 background: '#ffffff',
-                color: 'var(--ka-ink, #0B1E2E)',
+                color: 'var(--ka-ink)',
               }}
             />
-          </div>
+          </label>
 
-          <PasswordInput
-            id="login-password"
-            name="password"
-            label="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter your password"
-            autoComplete="current-password"
-            required
-          />
+          <label className="block">
+            <span
+              className="block text-[12px] font-bold mb-[7px]"
+              style={{ color: '#0B1E2E' }}
+            >
+              Password
+            </span>
+            <input
+              type="password"
+              required
+              name="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              placeholder="Enter your password"
+              className="w-full min-h-[44px] rounded-[10px] px-[14px] py-[10px] text-[14px] border outline-none transition-colors"
+              style={{
+                borderColor: 'var(--ka-line)',
+                background: '#ffffff',
+                color: 'var(--ka-ink)',
+              }}
+            />
+          </label>
 
           <div className="flex items-center justify-between text-[12px] my-[14px]">
-            <label className="flex items-center gap-2 cursor-pointer font-medium" style={{ color: 'var(--ka-muted, #64748B)' }}>
+            <label className="flex items-center gap-2 cursor-pointer font-medium" style={{ color: 'var(--ka-muted)' }}>
               <input
                 type="checkbox"
                 name="remember"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="rounded accent-[#0082A6]"
+                className="rounded text-[var(--ka-brand)]"
               />
               Remember me
             </label>
@@ -154,7 +155,7 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="text-center text-[13px] mt-[22px]" style={{ color: 'var(--ka-muted, #64748B)' }}>
+        <div className="text-center text-[13px] mt-[22px]" style={{ color: 'var(--ka-muted)' }}>
           New to KneeAxis?{' '}
           <Link
             href="/register"
@@ -163,14 +164,6 @@ export default function Login() {
           >
             Create an account
           </Link>
-        </div>
-
-        <div className="flex justify-center items-center gap-3 mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-400">
-          <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
-          <span>•</span>
-          <Link href="/terms" className="hover:underline">Terms of Use</Link>
-          <span>•</span>
-          <Link href="/medical-disclaimer" className="hover:underline">Medical Disclaimer</Link>
         </div>
       </div>
     </AuthLayout>
